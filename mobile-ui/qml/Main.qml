@@ -77,17 +77,19 @@ Item {
     function chooseTool(name) {
         var previousTool = selectedTool
         var completed = false
-        if (name === "Eraser")
-            completed = dispatch("setEraserMode", true)
-        else if (name === "Brush")
-            completed = dispatch("setEraserMode", false)
-        else
+        if (name === "Eraser") {
+            completed = dispatch("setActiveTool", "Brush")
+            if (completed)
+                completed = dispatch("setEraserMode", true)
+        } else if (name === "Brush") {
+            completed = dispatch("setActiveTool", "Brush")
+            if (completed)
+                completed = dispatch("setEraserMode", false)
+        } else {
             completed = dispatch("setActiveTool", name)
+        }
 
-        if (completed)
-            selectedTool = name
-        else
-            selectedTool = previousTool
+        selectedTool = completed ? name : previousTool
     }
 
     function choosePanel(name) {
