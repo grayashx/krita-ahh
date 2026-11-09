@@ -15,6 +15,7 @@
 
 #include <QAction>
 #include <QColor>
+#include <QMap>
 #include <kactioncollection.h>
 
 KisMobileBridge::KisMobileBridge(KisMainWindow *mainWindow)
