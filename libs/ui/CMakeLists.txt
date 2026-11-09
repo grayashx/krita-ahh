@@ -447,6 +447,7 @@ set(kritaui_LIB_SRCS
     kis_async_action_feedback.cpp
     KisMainWindow.cpp
     KisMobileBridge.cpp
+    mobile-ui/mobile-ui.qrc
     KisOpenPane.cpp
     KisPart.cpp
     KisTemplate.cpp
@@ -807,7 +808,13 @@ if (Mlt7_FOUND)
 endif()
 
 if (ANDROID)
-    target_link_libraries(kritaui PRIVATE GLESv3)
+    target_link_libraries(kritaui PRIVATE
+        GLESv3
+        Qt::Qml
+        Qt::Quick
+        Qt::QuickWidgets
+        Qt::QuickControls2
+    )
     target_link_libraries(kritaui PUBLIC Qt${QT_MAJOR_VERSION}::Gui)
     target_link_libraries(kritaui PRIVATE Qt${QT_MAJOR_VERSION}::AndroidExtras)
     if(TARGET LibAV)
