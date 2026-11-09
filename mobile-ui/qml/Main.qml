@@ -56,6 +56,8 @@ Item {
                 completed = kritaBridge.setForegroundColor(value)
             else if (action === "setEraserMode" && typeof kritaBridge.setEraserMode === "function")
                 completed = kritaBridge.setEraserMode(value)
+            else if (action === "setActiveTool" && typeof kritaBridge.setActiveTool === "function")
+                completed = kritaBridge.setActiveTool(value)
             else if (typeof kritaBridge.triggerAction === "function") {
                 var actionId = action
                 if (action === "undo") actionId = "edit_undo"
@@ -65,20 +67,27 @@ Item {
             }
             if (completed) {
                 statusText = "Ready"
-                return
+                return true
             }
         }
         statusText = "Action unavailable: " + action
+        return false
     }
 
     function chooseTool(name) {
-        selectedTool = name
+        var previousTool = selectedTool
+        var completed = false
         if (name === "Eraser")
-            dispatch("setEraserMode", true)
+            completed = dispatch("setEraserMode", true)
         else if (name === "Brush")
-            dispatch("setEraserMode", false)
+            completed = dispatch("setEraserMode", false)
         else
-            dispatch("setActiveTool", name)
+            completed = dispatch("setActiveTool", name)
+
+        if (completed)
+            selectedTool = name
+        else
+            selectedTool = previousTool
     }
 
     function choosePanel(name) {
