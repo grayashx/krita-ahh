@@ -145,3 +145,19 @@ bool KisMobileBridge::openRecentDocument(int index) const
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
     return m_mainWindow->openDocument(path, KisMainWindow::None);
 }
+
+bool KisMobileBridge::saveDocument(bool exportImage) const
+{
+    if (!hasActiveDocument()) return false;
+    return m_mainWindow->saveDocument(
+        m_mainWindow->activeView()->document(),
+        false,
+        exportImage);
+}
+
+void KisMobileBridge::showHomeScreen() const
+{
+    if (m_mainWindow) {
+        m_mainWindow->showWelcomeScreen(true);
+    }
+}
