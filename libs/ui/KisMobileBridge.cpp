@@ -8,12 +8,14 @@
 #include "KisMainWindow.h"
 #include "KisView.h"
 #include "KisViewManager.h"
+#include <KoToolManager.h>
 #include "kis_canvas_resource_provider.h"
 
 #include <KoColor.h>
 
 #include <QAction>
 #include <QColor>
+#include <QMap>
 #include <kactioncollection.h>
 
 KisMobileBridge::KisMobileBridge(KisMainWindow *mainWindow)
@@ -97,4 +99,29 @@ bool KisMobileBridge::setEraserMode(bool enabled) const
     if (!resources) return false;
     resources->setEraserMode(enabled);
     return true;
+}
+
+
+bool KisMobileBridge::setActiveTool(const QString &toolName) const
+{
+    if (!hasActiveDocument() || !m_mainWindow->viewManager()) return false;
+
+    // Keep the QML surface label-based. Only expose tools that are known to
+    // exist in Krita's registered tool factories.
+    static const QMap<QString, QString> toolIds {
+        {QStringLiteral("Brush"), QStringLiteral("KritaShape/KisToolBrush")},
+        {QStringLiteral("Picker"), QStringLiteral("KritaSelected/KisToolColorSampler")},
+        {QStringLiteral("Shape"), QStringLiteral("KritaShape/KisToolRectangle")},
+        {QStringLiteral("Text"), QStringLiteral("SvgTextTool")},
+        {QStringLiteral("Move"), QStringLiteral("KritaTransform/KisToolMove")}
+    };
+
+    const auto it = toolIds.constFind(toolName);
+    if (it == toolIds.cend()) return false;
+
+    KoToolManager *toolManager = m_mainWindow->viewManager()->toolManager();
+    if (!toolManager) return false;
+
+    toolManager->switchToolRequested(it.value());
+    return toolManager->activeToolId() == it.value();
 }
