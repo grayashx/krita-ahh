@@ -48,6 +48,11 @@
 #include <QScrollArea>
 #include <QActionGroup>
 
+#ifdef Q_OS_ANDROID
+#include <QQuickWidget>
+#include <QQmlContext>
+#endif
+
 #include <kactioncollection.h>
 #include <kactionmenu.h>
 #include <kis_debug.h>
@@ -310,6 +315,9 @@ public:
 #endif
     QScrollArea *welcomeScroller {nullptr};
     KisWelcomePageWidget *welcomePage {nullptr};
+#ifdef Q_OS_ANDROID
+    QQuickWidget *mobileHome {nullptr};
+#endif
 
 
     QStackedWidget *widgetStack {nullptr};
@@ -511,6 +519,38 @@ KisMainWindow::KisMainWindow(QUuid uuid)
     actionCollection()->addAssociatedWidget(d->canvasWindow);
 
     createActions();
+
+#ifdef Q_OS_ANDROID
+    // The Android welcome screen uses the touch-first QML shell. Keep the
+    // existing QWidget welcome page available as a fallback if QML fails.
+    d->mobileHome = new QQuickWidget(d->widgetStack);
+    d->mobileHome->engine()->rootContext()->setContextProperty(
+        QStringLiteral("mainWindow"), this);
+    d->mobileHome->setClearColor(QColor(QStringLiteral("#111216")));
+    d->mobileHome->setResizeMode(QQuickWidget::SizeRootObjectToView);
+
+    connect(d->mobileHome, &QQuickWidget::statusChanged, this,
+            [this](QQuickWidget::Status status) {
+        if (status == QQuickWidget::Ready) {
+            QObject *root = d->mobileHome->rootObject();
+            if (root) {
+                root->setProperty("kritaBridge",
+                                  QVariant::fromValue(static_cast<QObject *>(d->mobileBridge)));
+                root->setProperty("recentDocumentsModel",
+                                  QVariant::fromValue(static_cast<QObject *>(
+                                      &KisRecentDocumentsModelWrapper::instance()->model())));
+                root->setProperty("engineConnected", true);
+            }
+            d->widgetStack->removeWidget(d->welcomeScroller);
+            if (d->widgetStack->indexOf(d->mobileHome) < 0) {
+                d->widgetStack->insertWidget(0, d->mobileHome);
+            }
+        } else if (status == QQuickWidget::Error) {
+            qWarning() << "Mobile QML home screen failed to load; using the native welcome screen.";
+        }
+    });
+    d->mobileHome->setSource(QUrl(QStringLiteral("qrc:/mobile-ui/qml/Main.qml")));
+#endif
 
     // the welcome screen needs to grab actions...so make sure this line goes after the createAction() so they exist
     d->welcomePage->setMainWindow(this);
