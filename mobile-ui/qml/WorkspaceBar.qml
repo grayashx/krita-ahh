@@ -8,6 +8,7 @@ Item {
     property bool showLayers: false
     property var presetItems: []
     property var layerItems: []
+    readonly property bool tabletLayout: width >= 720
     implicitHeight: 132 + ((showBrushes || showLayers) ? 194 : 0)
 
     function refreshPresets() {
@@ -73,7 +74,7 @@ Item {
                     highlighted: root.showBrushes
                     onClicked: {
                         root.showBrushes = !root.showBrushes
-                        root.showLayers = false
+                        if (!root.tabletLayout) root.showLayers = false
                         if (root.showBrushes) refreshPresets()
                     }
                 }
@@ -82,7 +83,7 @@ Item {
                     highlighted: root.showLayers
                     onClicked: {
                         root.showLayers = !root.showLayers
-                        root.showBrushes = false
+                        if (!root.tabletLayout) root.showBrushes = false
                         if (root.showLayers) refreshLayers()
                     }
                 }
