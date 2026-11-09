@@ -46,11 +46,16 @@ Item {
     }
 
     function dispatch(action, value) {
-        if (kritaBridge && typeof kritaBridge[action] === "function") {
-            kritaBridge[action](value)
-        } else {
-            statusText = "Canvas connection pending"
+        if (kritaBridge && typeof kritaBridge.triggerAction === "function") {
+            var actionId = action
+            if (action === "undo") actionId = "edit_undo"
+            if (action === "redo") actionId = "edit_redo"
+            if (kritaBridge.triggerAction(actionId)) {
+                statusText = "Ready"
+                return
+            }
         }
+        statusText = "Action unavailable: " + action
     }
 
     function chooseTool(name) {
