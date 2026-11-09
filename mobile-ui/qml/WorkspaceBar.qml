@@ -8,14 +8,23 @@ Item {
     property bool showLayers: false
     property var presetItems: []
     property var layerItems: []
+    property double selectedLayerId: 0
     readonly property bool tabletLayout: width >= 720
-    implicitHeight: 132 + ((showBrushes || showLayers) ? 194 : 0)
+    implicitHeight: 168 + ((showBrushes || showLayers) ? 230 : 0)
 
     function refreshPresets() {
         presetItems = kritaBridge ? kritaBridge.brushPresets(presetSearch.text) : []
     }
     function refreshLayers() {
         layerItems = kritaBridge ? kritaBridge.layers() : []
+        if (selectedLayerId === 0 && layerItems.length) {
+            for (var i = 0; i < layerItems.length; ++i) {
+                if (layerItems[i].active) {
+                    selectedLayerId = layerItems[i].id
+                    break
+                }
+            }
+        }
     }
 
     Rectangle {
@@ -36,6 +45,43 @@ Item {
                 ToolButton { text: "↷"; onClicked: if (kritaBridge) kritaBridge.triggerAction("edit_redo") }
                 ToolButton { text: "Save"; onClicked: if (kritaBridge) kritaBridge.saveDocument(false) }
                 ToolButton { text: "Export"; onClicked: if (kritaBridge) kritaBridge.saveDocument(true) }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                Label { text: "FG"; color: "#c7c4be"; font.pixelSize: 10 }
+                TextField {
+                    id: foregroundHex
+                    Layout.preferredWidth: 92
+                    text: kritaBridge ? kritaBridge.foregroundColor() : "#000000"
+                    placeholderText: "#RRGGBB"
+                    onAccepted: if (kritaBridge) kritaBridge.setForegroundColor(text)
+                }
+                Button {
+                    text: "Set"
+                    onClicked: if (kritaBridge) kritaBridge.setForegroundColor(foregroundHex.text)
+                }
+                Label { text: "BG"; color: "#c7c4be"; font.pixelSize: 10 }
+                TextField {
+                    id: backgroundHex
+                    Layout.preferredWidth: 92
+                    text: kritaBridge ? kritaBridge.backgroundColor() : "#ffffff"
+                    placeholderText: "#RRGGBB"
+                    onAccepted: if (kritaBridge) kritaBridge.setBackgroundColor(text)
+                }
+                Button {
+                    text: "Set"
+                    onClicked: if (kritaBridge) kritaBridge.setBackgroundColor(backgroundHex.text)
+                }
+                Button {
+                    text: "Swap"
+                    onClicked: {
+                        if (kritaBridge) kritaBridge.swapColors()
+                        foregroundHex.text = kritaBridge ? kritaBridge.foregroundColor() : "#000000"
+                        backgroundHex.text = kritaBridge ? kritaBridge.backgroundColor() : "#ffffff"
+                    }
+                }
             }
 
             RowLayout {
@@ -112,7 +158,7 @@ Item {
             Rectangle {
                 visible: root.showBrushes || root.showLayers
                 Layout.fillWidth: true
-                Layout.preferredHeight: 188
+                Layout.preferredHeight: 224
                 color: "#22252d"
                 radius: 6
 
@@ -155,6 +201,22 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             Label { text: "Document layers"; color: "#f0eee9"; font.bold: true; Layout.fillWidth: true }
+                            ToolButton {
+                                text: "↑"
+                                enabled: root.selectedLayerId !== 0
+                                onClicked: {
+                                    if (kritaBridge) kritaBridge.raiseLayer(root.selectedLayerId)
+                                    root.refreshLayers()
+                                }
+                            }
+                            ToolButton {
+                                text: "↓"
+                                enabled: root.selectedLayerId !== 0
+                                onClicked: {
+                                    if (kritaBridge) kritaBridge.lowerLayer(root.selectedLayerId)
+                                    root.refreshLayers()
+                                }
+                            }
                             ToolButton { text: "↻"; onClicked: root.refreshLayers() }
                         }
                         ListView {
@@ -165,7 +227,7 @@ Item {
                             model: root.layerItems
                             delegate: RowLayout {
                                 width: ListView.view.width
-                                height: 40
+                                height: 38
                                 CheckBox {
                                     checked: modelData.visible
                                     onToggled: {
@@ -176,14 +238,22 @@ Item {
                                 Button {
                                     Layout.fillWidth: true
                                     text: modelData.name + (modelData.active ? "  •" : "")
-                                    highlighted: modelData.active
+                                    highlighted: modelData.active || root.selectedLayerId === modelData.id
                                     onClicked: {
+                                        root.selectedLayerId = modelData.id
                                         if (kritaBridge) kritaBridge.activateLayer(modelData.id)
                                         root.refreshLayers()
                                     }
                                 }
+                                ToolButton {
+                                    text: modelData.locked ? "🔒" : "🔓"
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.setLayerLocked(modelData.id, !modelData.locked)
+                                        root.refreshLayers()
+                                    }
+                                }
                                 TextField {
-                                    Layout.preferredWidth: 150
+                                    Layout.preferredWidth: 100
                                     placeholderText: "Rename"
                                     onAccepted: {
                                         if (kritaBridge && text.trim().length)
@@ -201,6 +271,24 @@ Item {
                                 }
                             }
                             ScrollBar.vertical: ScrollBar {}
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label { text: "Layer opacity"; color: "#c7c4be"; font.pixelSize: 10 }
+                            Slider {
+                                Layout.fillWidth: true
+                                from: 0; to: 100
+                                value: {
+                                    for (var i = 0; i < root.layerItems.length; ++i)
+                                        if (root.layerItems[i].id === root.selectedLayerId)
+                                            return root.layerItems[i].opacity
+                                    return 100
+                                }
+                                onMoved: {
+                                    if (kritaBridge && root.selectedLayerId !== 0)
+                                        kritaBridge.setLayerOpacity(root.selectedLayerId, value)
+                                }
+                            }
                         }
                     }
                 }
