@@ -447,7 +447,7 @@ set(kritaui_LIB_SRCS
     kis_async_action_feedback.cpp
     KisMainWindow.cpp
     KisMobileBridge.cpp
-    mobile-ui/mobile-ui.qrc
+    ../../mobile-ui/mobile-ui.qrc
     KisOpenPane.cpp
     KisPart.cpp
     KisTemplate.cpp
