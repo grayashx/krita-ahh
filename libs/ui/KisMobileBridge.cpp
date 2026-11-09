@@ -285,8 +285,7 @@ QVariantList KisMobileBridge::layers() const
              node = node->nextSibling()) {
             QVariantMap item;
             item.insert(QStringLiteral("id"),
-                        QVariant::fromValue<qulonglong>(
-                            reinterpret_cast<quintptr>(node.data())));
+                        QString::number(reinterpret_cast<quintptr>(node.data()), 16));
             item.insert(QStringLiteral("name"), node->name());
             item.insert(QStringLiteral("visible"), node->visible());
             item.insert(QStringLiteral("opacity"), node->percentOpacity());
@@ -300,16 +299,18 @@ QVariantList KisMobileBridge::layers() const
     return result;
 }
 
-static KisNodeSP findMobileNode(KisImageSP image, qulonglong id)
+static KisNodeSP findMobileNode(KisImageSP image, const QString &id)
 {
-    if (!image || !image->root() || !id) return KisNodeSP();
+    bool ok = false;
+    const quintptr nodeAddress = static_cast<quintptr>(id.toULongLong(&ok, 16));
+    if (!image || !image->root() || !ok || !nodeAddress) return KisNodeSP();
 
     KisNodeSP found;
     std::function<void(KisNodeSP)> visit = [&](KisNodeSP parent) {
         for (KisNodeSP node = parent ? parent->firstChild() : KisNodeSP();
              node && !found;
              node = node->nextSibling()) {
-            if (reinterpret_cast<quintptr>(node.data()) == static_cast<quintptr>(id)) {
+            if (reinterpret_cast<quintptr>(node.data()) == nodeAddress) {
                 found = node;
                 return;
             }
@@ -320,7 +321,7 @@ static KisNodeSP findMobileNode(KisImageSP image, qulonglong id)
     return found;
 }
 
-bool KisMobileBridge::activateLayer(qulonglong id) const
+bool KisMobileBridge::activateLayer(const QString &id) const
 {
     if (!hasActiveDocument()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
@@ -329,7 +330,7 @@ bool KisMobileBridge::activateLayer(qulonglong id) const
     return true;
 }
 
-bool KisMobileBridge::setLayerVisible(qulonglong id, bool visible) const
+bool KisMobileBridge::setLayerVisible(const QString &id, bool visible) const
 {
     if (!hasActiveDocument()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
@@ -339,7 +340,7 @@ bool KisMobileBridge::setLayerVisible(qulonglong id, bool visible) const
     return true;
 }
 
-bool KisMobileBridge::renameLayer(qulonglong id, const QString &name) const
+bool KisMobileBridge::renameLayer(const QString &id, const QString &name) const
 {
     if (!hasActiveDocument() || name.trimmed().isEmpty()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
@@ -348,7 +349,7 @@ bool KisMobileBridge::renameLayer(qulonglong id, const QString &name) const
     return true;
 }
 
-bool KisMobileBridge::removeLayer(qulonglong id) const
+bool KisMobileBridge::removeLayer(const QString &id) const
 {
     if (!hasActiveDocument()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
@@ -364,7 +365,7 @@ bool KisMobileBridge::addPaintLayer() const
 }
 
 
-bool KisMobileBridge::setLayerOpacity(qulonglong id, qreal opacityPercent) const
+bool KisMobileBridge::setLayerOpacity(const QString &id, qreal opacityPercent) const
 {
     if (!hasActiveDocument()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
@@ -374,7 +375,7 @@ bool KisMobileBridge::setLayerOpacity(qulonglong id, qreal opacityPercent) const
     return true;
 }
 
-bool KisMobileBridge::setLayerLocked(qulonglong id, bool locked) const
+bool KisMobileBridge::setLayerLocked(const QString &id, bool locked) const
 {
     if (!hasActiveDocument()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
@@ -384,14 +385,14 @@ bool KisMobileBridge::setLayerLocked(qulonglong id, bool locked) const
     return true;
 }
 
-bool KisMobileBridge::raiseLayer(qulonglong id) const
+bool KisMobileBridge::raiseLayer(const QString &id) const
 {
     if (!activateLayer(id)) return false;
     m_mainWindow->viewManager()->nodeManager()->raiseNode();
     return true;
 }
 
-bool KisMobileBridge::lowerLayer(qulonglong id) const
+bool KisMobileBridge::lowerLayer(const QString &id) const
 {
     if (!activateLayer(id)) return false;
     m_mainWindow->viewManager()->nodeManager()->lowerNode();
