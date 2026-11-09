@@ -8,7 +8,7 @@ Item {
     property bool showLayers: false
     property var presetItems: []
     property var layerItems: []
-    property double selectedLayerId: 0
+    property string selectedLayerId: ""
     readonly property bool tabletLayout: width >= 720
     implicitHeight: 168 + ((showBrushes || showLayers) ? 230 : 0)
 
@@ -17,7 +17,7 @@ Item {
     }
     function refreshLayers() {
         layerItems = kritaBridge ? kritaBridge.layers() : []
-        if (selectedLayerId === 0 && layerItems.length) {
+        if (selectedLayerId === "" && layerItems.length) {
             for (var i = 0; i < layerItems.length; ++i) {
                 if (layerItems[i].active) {
                     selectedLayerId = layerItems[i].id
@@ -53,7 +53,7 @@ Item {
                 Label { text: "FG"; color: "#c7c4be"; font.pixelSize: 10 }
                 TextField {
                     id: foregroundHex
-                    Layout.preferredWidth: 92
+                    Layout.preferredWidth: 76
                     text: kritaBridge ? kritaBridge.foregroundColor() : "#000000"
                     placeholderText: "#RRGGBB"
                     onAccepted: if (kritaBridge) kritaBridge.setForegroundColor(text)
@@ -203,7 +203,7 @@ Item {
                             Label { text: "Document layers"; color: "#f0eee9"; font.bold: true; Layout.fillWidth: true }
                             ToolButton {
                                 text: "↑"
-                                enabled: root.selectedLayerId !== 0
+                                enabled: root.selectedLayerId !== ""
                                 onClicked: {
                                     if (kritaBridge) kritaBridge.raiseLayer(root.selectedLayerId)
                                     root.refreshLayers()
