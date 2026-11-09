@@ -99,7 +99,7 @@ Item {
                     Layout.fillWidth: true
                     from: 1
                     to: 500
-                    value: 18
+                    value: kritaBridge ? kritaBridge.brushSize() : 18
                     onMoved: if (kritaBridge) kritaBridge.setBrushSize(value)
                 }
                 Label {
@@ -111,7 +111,7 @@ Item {
                     Layout.fillWidth: true
                     from: 1
                     to: 100
-                    value: 100
+                    value: kritaBridge ? kritaBridge.brushOpacity() : 100
                     onMoved: if (kritaBridge) kritaBridge.setBrushOpacity(value)
                 }
             }
