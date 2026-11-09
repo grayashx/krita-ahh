@@ -27,6 +27,8 @@ public:
     Q_INVOKABLE bool triggerAction(const QString &actionId) const;
     Q_INVOKABLE bool isActionEnabled(const QString &actionId) const;
     Q_INVOKABLE bool hasActiveDocument() const;
+    Q_INVOKABLE qreal brushSize() const;
+    Q_INVOKABLE qreal brushOpacity() const;
     Q_INVOKABLE bool setBrushSize(qreal size) const;
     Q_INVOKABLE bool setBrushOpacity(qreal opacityPercent) const;
     Q_INVOKABLE bool setForegroundColor(const QString &colorName) const;
