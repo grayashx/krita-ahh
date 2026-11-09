@@ -27,6 +27,13 @@
 #include <QTemporaryFile>
 #include <QApplication>
 #include <QScreen>
+
+#ifdef Q_OS_ANDROID
+#include <QColor>
+#include <QQmlContext>
+#include <QQuickWidget>
+#include <QVBoxLayout>
+#endif
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QList>
@@ -225,6 +232,28 @@ KisView::KisView(KisDocument *document, KisViewManager *viewManager, QWidget *pa
     d->canvasController.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     d->canvasController.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     d->canvasController.setCanvas(&d->canvas);
+
+#ifdef Q_OS_ANDROID
+    // Keep Krita's native canvas controller as the actual painting surface.
+    // QML is confined to a separate control strip so it cannot intercept
+    // stylus, touch, or pinch events sent to the canvas viewport.
+    QQuickWidget *mobileControls = new QQuickWidget(this);
+    mobileControls->engine()->rootContext()->setContextProperty(
+        QStringLiteral("kritaBridge"),
+        static_cast<QObject *>(viewManager->mainWindow()->mobileBridge()));
+    mobileControls->setClearColor(QColor(QStringLiteral("#111216")));
+    mobileControls->setResizeMode(QQuickWidget::SizeRootObjectToView);
+    mobileControls->setFixedHeight(132);
+    mobileControls->setSource(QUrl(QStringLiteral("qrc:/mobile-ui/qml/WorkspaceBar.qml")));
+
+    QVBoxLayout *mobileLayout = new QVBoxLayout(this);
+    mobileLayout->setContentsMargins(0, 0, 0, 0);
+    mobileLayout->setSpacing(0);
+    mobileLayout->addWidget(mobileControls, 0);
+    mobileLayout->addWidget(&d->canvasController, 1);
+    d->canvasController.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    d->canvasController.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+#endif
 
     d->zoomManager.setup(d->actionCollection);
 
