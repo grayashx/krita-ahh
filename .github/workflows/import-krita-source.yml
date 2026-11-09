@@ -42,9 +42,9 @@ jobs:
           UPSTREAM_SHA: f260d4523839a306f3b856b7158d5ca78b1c9b9f
         run: |
           set -euo pipefail
-          ARCHIVE="/tmp/krita-\${UPSTREAM_SHA}.tar.gz"
+          ARCHIVE="/tmp/krita-${UPSTREAM_SHA}.tar.gz"
           SOURCE_DIR="/tmp/krita-source"
-          URL="https://invent.kde.org/graphics/krita/-/archive/\${UPSTREAM_SHA}/krita-\${UPSTREAM_SHA}.tar.gz"
+          URL="https://invent.kde.org/graphics/krita/-/archive/${UPSTREAM_SHA}/krita-${UPSTREAM_SHA}.tar.gz"
 
           curl --fail --location --retry 3 --retry-delay 3 "$URL" --output "$ARCHIVE"
           mkdir -p "$SOURCE_DIR"
@@ -123,11 +123,11 @@ jobs:
             const base = "main";
 
             const existing = await github.rest.pulls.list({
-              owner, repo, state: "open", head: \`\${owner}:\${head}\`, base
+              owner, repo, state: "open", head: `${owner}:${head}`, base
             });
 
             if (existing.data.length > 0) {
-              core.info(\`Pull request already exists: \${existing.data[0].html_url}\`);
+              core.info(`Pull request already exists: ${existing.data[0].html_url}`);
               core.setOutput("pull-request-url", existing.data[0].html_url);
               return;
             }
@@ -144,17 +144,17 @@ jobs:
                 "Imports the pinned source snapshot from the official KDE Krita repository as the initial technical foundation for this project.",
                 "",
                 "- **Upstream:** https://invent.kde.org/graphics/krita",
-                "- **Commit:** \`f260d4523839a306f3b856b7158d5ca78b1c9b9f\`",
+                "- **Commit:** `f260d4523839a306f3b856b7158d5ca78b1c9b9f`",
                 "- **Project direction:** Android-first, adaptive interface, hybrid brush system.",
                 "",
                 "## Review notes",
                 "",
                 "- This is an upstream source import, not an ibisPaint code copy.",
                 "- Upstream license and copyright files are retained.",
-                "- Product-specific plans are documented in \`project/OUR_PROJECT_DIRECTION.md\`.",
+                "- Product-specific plans are documented in `project/OUR_PROJECT_DIRECTION.md`.",
                 "- No claim is made that the application has been ported or built yet."
-              ].join("\\n")
+              ].join("\n")
             });
 
-            core.info(\`Created pull request: \${response.data.html_url}\`);
+            core.info(`Created pull request: ${response.data.html_url}`);
             core.setOutput("pull-request-url", response.data.html_url);
