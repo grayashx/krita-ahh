@@ -63,6 +63,20 @@ bool KisMobileBridge::hasActiveDocument() const
         && m_mainWindow->activeView()->document();
 }
 
+qreal KisMobileBridge::brushSize() const
+{
+    if (!hasActiveDocument()) return 18.0;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    return resources ? resources->size() : 18.0;
+}
+
+qreal KisMobileBridge::brushOpacity() const
+{
+    if (!hasActiveDocument()) return 100.0;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    return resources ? resources->opacity() * 100.0 : 100.0;
+}
+
 bool KisMobileBridge::setBrushSize(qreal size) const
 {
     if (!hasActiveDocument()) return false;
