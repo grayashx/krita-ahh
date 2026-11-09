@@ -8,6 +8,7 @@
 #include "KisMainWindow.h"
 #include "KisView.h"
 #include "KisViewManager.h"
+#include "KisRecentDocumentsModelWrapper.h"
 #include <KoToolManager.h>
 #include "kis_canvas_resource_provider.h"
 
@@ -16,6 +17,7 @@
 #include <QAction>
 #include <QColor>
 #include <QMap>
+#include <QUrl>
 #include <kactioncollection.h>
 
 KisMobileBridge::KisMobileBridge(KisMainWindow *mainWindow)
@@ -124,4 +126,22 @@ bool KisMobileBridge::setActiveTool(const QString &toolName) const
 
     toolManager->switchToolRequested(it.value());
     return toolManager->activeToolId() == it.value();
+}
+
+
+bool KisMobileBridge::openRecentDocument(int index) const
+{
+    if (!m_mainWindow || index < 0) return false;
+
+    KisRecentDocumentsModelWrapper *recentFiles = KisRecentDocumentsModelWrapper::instance();
+    if (!recentFiles) return false;
+
+    QStandardItemModel &model = recentFiles->model();
+    if (index >= model.rowCount()) return false;
+
+    const QUrl url = model.index(index, 0).data(Qt::UserRole + 1).toUrl();
+    if (url.isEmpty()) return false;
+
+    const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
+    return m_mainWindow->openDocument(path, KisMainWindow::None);
 }
