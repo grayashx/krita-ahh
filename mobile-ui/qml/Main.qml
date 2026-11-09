@@ -380,12 +380,8 @@ Item {
                         }
                     }
 
-                    PinchArea {
-                        anchors.fill: parent
-                        onPinchUpdated: {
-                            root.zoom = Math.max(10, Math.min(800, root.zoom * pinch.scale))
-                        }
-                    }
+                    // Native Krita canvas owns stylus strokes, touch gestures and pinch zoom.
+                    // Do not place a QML MouseArea over this surface: it would intercept painting input.
                 }
 
                 // Right-side panel: collapses on narrow screens.
@@ -842,7 +838,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 10
-        visible: root.statusText !== ""
+        visible: root.statusText !== "" && root.statusText !== "Ready"
         radius: 10
         color: "#e52a2d35"
         width: Math.min(parent.width - 32, statusLabel.implicitWidth + 26)
