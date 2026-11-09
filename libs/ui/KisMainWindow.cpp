@@ -233,6 +233,7 @@ public:
     QUuid id;
 
     KisViewManager *viewManager {nullptr};
+    KisMobileBridge *mobileBridge {nullptr};
 
     QPointer<KisView> activeView;
     KisSignalAutoConnectionsStore activeViewConnections;
@@ -375,6 +376,7 @@ KisMainWindow::KisMainWindow(QUuid uuid)
     connect(d->workspacemodel, SIGNAL(rowsRemoved(QModelIndex,int,int)), this, SLOT(updateWindowMenu()));
 
     d->viewManager = new KisViewManager(this, actionCollection());
+    d->mobileBridge = new KisMobileBridge(this);
     KConfigGroup group( KSharedConfig::openConfig(), "theme");
 #ifndef Q_OS_HAIKU
     d->themeManager = new Digikam::ThemeManager(group.readEntry("Theme", "Krita dark"), this);
@@ -2178,6 +2180,11 @@ void KisMainWindow::swapWorkspaces(KisMainWindow *a, KisMainWindow *b)
 KisViewManager *KisMainWindow::viewManager() const
 {
     return d->viewManager;
+}
+
+KisMobileBridge *KisMainWindow::mobileBridge() const
+{
+    return d->mobileBridge;
 }
 
 void KisMainWindow::slotDocumentInfo()

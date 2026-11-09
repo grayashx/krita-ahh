@@ -46,16 +46,50 @@ Item {
     }
 
     function dispatch(action, value) {
-        if (kritaBridge && typeof kritaBridge[action] === "function") {
-            kritaBridge[action](value)
-        } else {
-            statusText = "Canvas connection pending"
+        if (kritaBridge) {
+            var completed = false
+            if (action === "setBrushSize" && typeof kritaBridge.setBrushSize === "function")
+                completed = kritaBridge.setBrushSize(value)
+            else if (action === "setBrushOpacity" && typeof kritaBridge.setBrushOpacity === "function")
+                completed = kritaBridge.setBrushOpacity(value)
+            else if (action === "setForegroundColor" && typeof kritaBridge.setForegroundColor === "function")
+                completed = kritaBridge.setForegroundColor(value)
+            else if (action === "setEraserMode" && typeof kritaBridge.setEraserMode === "function")
+                completed = kritaBridge.setEraserMode(value)
+            else if (action === "setActiveTool" && typeof kritaBridge.setActiveTool === "function")
+                completed = kritaBridge.setActiveTool(value)
+            else if (typeof kritaBridge.triggerAction === "function") {
+                var actionId = action
+                if (action === "undo") actionId = "edit_undo"
+                if (action === "redo") actionId = "edit_redo"
+                if (action === "addLayer") actionId = "add_new_paint_layer"
+                completed = kritaBridge.triggerAction(actionId)
+            }
+            if (completed) {
+                statusText = "Ready"
+                return true
+            }
         }
+        statusText = "Action unavailable: " + action
+        return false
     }
 
     function chooseTool(name) {
-        selectedTool = name
-        dispatch("setActiveTool", name)
+        var previousTool = selectedTool
+        var completed = false
+        if (name === "Eraser") {
+            completed = dispatch("setActiveTool", "Brush")
+            if (completed)
+                completed = dispatch("setEraserMode", true)
+        } else if (name === "Brush") {
+            completed = dispatch("setActiveTool", "Brush")
+            if (completed)
+                completed = dispatch("setEraserMode", false)
+        } else {
+            completed = dispatch("setActiveTool", name)
+        }
+
+        selectedTool = completed ? name : previousTool
     }
 
     function choosePanel(name) {

@@ -17,10 +17,12 @@ This directory contains the first mobile-first application interface for the Kri
 
 \`Main.qml\` is an embeddable \`Item\`, not a second application window. The native host should mount the existing Krita canvas in the marked canvas surface and expose a QObject bridge through \`kritaBridge\`.
 
-The bridge is intentionally thin. It should forward UI intent to existing Krita controllers/actions for:
+The native bridge is implemented as `KisMobileBridge`, exposed by `KisMainWindow::mobileBridge`. It invokes existing `QAction` entries by their Krita action IDs, updates the active brush resources, and reports whether an action is enabled or a document is active. Undo and redo use Krita's existing `edit_undo` and `edit_redo` actions. The mobile tool rail now switches the real Krita tool for Brush, Picker, Shape (Rectangle), Text and Move. Eraser remains Krita's eraser-mode resource on the brush tool.
+
+The bridge remains intentionally thin. Further UI controls should forward intent to existing Krita controllers/actions for:
 
 - document creation/open/save/export
-- active tool, undo and redo
+- active tool, undo and redo (tool mappings are limited to verified registered Krita tool IDs)
 - active brush preset and brush parameters
 - active layer and layer visibility
 - foreground color
@@ -38,6 +40,6 @@ Do not duplicate the painting engine, document model, brush engine, layer stack 
 
 ## Status and limitations
 
-This is the mobile UI shell and navigation prototype. The canvas rectangle is a clearly marked host slot, not a replacement painting surface. The QML controls currently call the optional bridge when one is attached; Krita engine integration and Android build wiring are separate follow-up work. No desktop source files have been removed or rewritten by this UI addition.
+This is the mobile UI shell and navigation prototype. The canvas rectangle is a clearly marked host slot, not a replacement painting surface. The QML controls can call the bridge once the mobile QML host supplies `KisMainWindow::mobileBridge`. The bridge is compiled into `kritaui`, but the QML shell is not yet mounted in the Android window and canvas embedding is still a separate integration step. The Fill rail item is intentionally not mapped yet because a matching interactive Krita fill-tool factory ID has not been verified; it reports unavailable instead of silently switching to a different tool. This change has not been built or run in an Android target. No desktop source files have been removed or rewritten by this UI addition.
 
 The repository's upstream Krita license and copyright notices continue to apply to upstream code. Keep new application-specific code clearly separated and retain all applicable notices.
