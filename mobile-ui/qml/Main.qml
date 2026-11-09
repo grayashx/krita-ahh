@@ -21,7 +21,6 @@ Item {
     property real brushSize: 18
     property real brushOpacity: 100
     property real zoom: 100
-    property bool showNewCanvas: false
     property bool showExport: false
     property bool showBrushEditor: false
     property bool showLayerPanel: true
@@ -30,6 +29,7 @@ Item {
     // Set by the C++ host when the Krita canvas/controller bridge is attached.
     // No fake painting implementation is provided here.
     property var kritaBridge: null
+    property var recentDocumentsModel: null
 
     readonly property color bg: "#111216"
     readonly property color surface: "#1a1c22"
@@ -48,7 +48,9 @@ Item {
     function dispatch(action, value) {
         if (kritaBridge) {
             var completed = false
-            if (action === "setBrushSize" && typeof kritaBridge.setBrushSize === "function")
+            if (action === "openRecent" && typeof kritaBridge.openRecentDocument === "function")
+                completed = kritaBridge.openRecentDocument(value)
+            else if (action === "setBrushSize" && typeof kritaBridge.setBrushSize === "function")
                 completed = kritaBridge.setBrushSize(value)
             else if (action === "setBrushOpacity" && typeof kritaBridge.setBrushOpacity === "function")
                 completed = kritaBridge.setBrushOpacity(value)
@@ -141,29 +143,23 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
-                Rectangle {
+                Button {
                     Layout.fillWidth: true
-                    height: 46
-                    radius: 12
-                    color: root.surface
-                    border.color: root.line
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 13
-                        anchors.rightMargin: 13
-                        Label { text: "⌕"; color: root.muted; font.pixelSize: 21 }
-                        TextField {
-                            Layout.fillWidth: true
-                            placeholderText: "Search projects"
-                            color: root.textColor
-                            placeholderTextColor: root.muted
-                            background: Item {}
-                        }
+                    text: "Open file"
+                    onClicked: root.dispatch("file_open")
+                    background: Rectangle { radius: 12; color: root.raised; border.color: root.line }
+                    contentItem: Label {
+                        text: parent.text
+                        color: root.textColor
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
                 Button {
-                    text: "+ New"
-                    onClicked: root.showNewCanvas = true
+                    Layout.fillWidth: true
+                    text: "+ New canvas"
+                    onClicked: root.dispatch("file_new")
                     background: Rectangle { radius: 12; color: root.accent }
                     contentItem: Label {
                         text: parent.text
@@ -178,76 +174,80 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 Label {
-                    text: "Recent projects"
+                    text: "Recent documents"
                     color: root.textColor
                     font.pixelSize: 18
                     font.bold: true
                 }
                 Item { Layout.fillWidth: true }
-                Label { text: "View all  ›"; color: root.accent; font.pixelSize: 13 }
             }
 
-            GridLayout {
+            ListView {
+                id: recentFilesList
                 Layout.fillWidth: true
-                columns: width > 620 ? 3 : 2
-                columnSpacing: 12
-                rowSpacing: 14
+                Layout.fillHeight: true
+                clip: true
+                spacing: 9
+                model: root.recentDocumentsModel
 
-                Repeater {
-                    model: [
-                        { title: "Untitled study", detail: "2048 × 2048 · Edited today", tint: "#d9c9b7" },
-                        { title: "Character sketch", detail: "1800 × 2400 · Yesterday", tint: "#b9c5cf" },
-                        { title: "Color practice", detail: "1920 × 1080 · 2 days ago", tint: "#c9b8d8" },
-                        { title: "Landscape", detail: "3000 × 2000 · 5 days ago", tint: "#a9c4b3" }
-                    ]
-                    delegate: Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 176
-                        radius: 14
-                        color: root.surface
-                        border.color: root.line
-                        Column {
-                            anchors.fill: parent
-                            anchors.margins: 9
-                            spacing: 8
-                            Rectangle {
-                                width: parent.width
-                                height: 112
-                                radius: 9
-                                color: modelData.tint
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: parent.width * 0.54
-                                    height: parent.height * 0.72
-                                    color: "#f4eee6"
-                                    border.color: "#d4c8bb"
-                                    Rectangle {
-                                        width: parent.width * 0.55
-                                        height: 2
-                                        color: "#85766d"
-                                        rotation: -24
-                                        anchors.centerIn: parent
-                                    }
-                                }
-                            }
+                delegate: Rectangle {
+                    width: recentFilesList.width
+                    height: 72
+                    radius: 12
+                    color: root.surface
+                    border.color: root.line
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 13
+                        spacing: 12
+                        Rectangle {
+                            Layout.preferredWidth: 42
+                            Layout.preferredHeight: 46
+                            radius: 8
+                            color: root.raised
                             Label {
-                                text: modelData.title
+                                anchors.centerIn: parent
+                                text: "K"
+                                color: root.accent
+                                font.bold: true
+                                font.pixelSize: 18
+                            }
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 3
+                            Label {
+                                Layout.fillWidth: true
+                                text: model.display
                                 color: root.textColor
                                 font.pixelSize: 13
                                 font.bold: true
+                                elide: Text.ElideMiddle
                             }
                             Label {
-                                text: modelData.detail
+                                Layout.fillWidth: true
+                                text: model.toolTip
                                 color: root.muted
                                 font.pixelSize: 10
+                                elide: Text.ElideMiddle
                             }
                         }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.openWorkspace()
-                        }
+                        Label { text: "›"; color: root.muted; font.pixelSize: 20 }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.dispatch("openRecent", index)
                     }
                 }
+            }
+            Label {
+                Layout.fillWidth: true
+                visible: recentFilesList.count === 0
+                text: "Your recent documents will appear here."
+                color: root.muted
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 13
             }
 
             Item { Layout.fillHeight: true }
@@ -704,63 +704,6 @@ Item {
                 }
             }
             Item { Layout.fillHeight: true }
-        }
-    }
-
-    // NEW CANVAS FLOW
-    Rectangle {
-        anchors.fill: parent
-        visible: root.showNewCanvas
-        color: "#99000000"
-        MouseArea { anchors.fill: parent; onClicked: root.showNewCanvas = false }
-        Rectangle {
-            width: Math.min(parent.width - 32, 420)
-            height: 390
-            radius: 18
-            color: root.surface
-            anchors.centerIn: parent
-            MouseArea { anchors.fill: parent }
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 20
-                spacing: 12
-                Label { text: "Create canvas"; color: root.textColor; font.pixelSize: 21; font.bold: true }
-                Label { text: "Choose a starting size"; color: root.muted; font.pixelSize: 12 }
-                Repeater {
-                    model: [
-                        { title: "Square", size: "2048 × 2048 px" },
-                        { title: "Portrait", size: "1800 × 2400 px" },
-                        { title: "Landscape", size: "2560 × 1600 px" },
-                        { title: "Custom", size: "Set width and height" }
-                    ]
-                    delegate: Rectangle {
-                        Layout.fillWidth: true
-                        height: 48
-                        radius: 9
-                        color: root.raised
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            Label { text: modelData.title; color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                            Label { text: modelData.size; color: root.muted; font.pixelSize: 10 }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                root.showNewCanvas = false
-                                root.openWorkspace()
-                                root.dispatch("createDocument", modelData.title)
-                            }
-                        }
-                    }
-                }
-                Item { Layout.fillHeight: true }
-                Button {
-                    Layout.fillWidth: true
-                    text: "Cancel"
-                    onClicked: root.showNewCanvas = false
-                }
-            }
         }
     }
 
