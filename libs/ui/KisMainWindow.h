@@ -8,6 +8,8 @@
 #ifndef KIS_MAIN_WINDOW_H
 #define KIS_MAIN_WINDOW_H
 
+#include "KisMobileBridge.h"
+
 #include "kritaui_export.h"
 
 #include <QPointer>
@@ -46,6 +48,7 @@ class KoCanvasController;
 class KRITAUI_EXPORT KisMainWindow : public KXmlGuiWindow, public KoCanvasSupervisor
 {
     Q_OBJECT
+    Q_PROPERTY(KisMobileBridge *mobileBridge READ mobileBridge CONSTANT)
 
 public:
     enum OpenFlag {
@@ -146,6 +149,7 @@ public:
     static void swapWorkspaces(KisMainWindow *a, KisMainWindow *b);
 
     KisViewManager *viewManager() const;
+    KisMobileBridge *mobileBridge() const;
 
     KisView *addViewAndNotifyLoadingCompleted(KisDocument *document,
                                               QMdiSubWindow *subWindow = 0);
