@@ -50,6 +50,8 @@
 
 #ifdef Q_OS_ANDROID
 #include <QQuickWidget>
+#include <QColor>
+#include <QVariant>
 #include <QQmlContext>
 #endif
 
