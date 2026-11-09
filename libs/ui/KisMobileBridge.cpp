@@ -9,6 +9,12 @@
 #include "KisView.h"
 #include "KisViewManager.h"
 #include "KisRecentDocumentsModelWrapper.h"
+#include "kis_node_manager.h"
+#include "kis_node.h"
+#include "kis_image.h"
+#include "kis_paintop_preset.h"
+#include <KisResourceModel.h>
+#include <KisResourceTypes.h>
 #include <KoToolManager.h>
 #include "kis_canvas_resource_provider.h"
 
@@ -18,6 +24,8 @@
 #include <QColor>
 #include <QMap>
 #include <QUrl>
+#include <QVariantMap>
+#include <functional>
 #include <kactioncollection.h>
 
 KisMobileBridge::KisMobileBridge(KisMainWindow *mainWindow)
@@ -174,4 +182,134 @@ void KisMobileBridge::showHomeScreen() const
     if (m_mainWindow) {
         m_mainWindow->showWelcomeScreen(true);
     }
+}
+
+
+QVariantList KisMobileBridge::brushPresets(const QString &filter) const
+{
+    QVariantList result;
+    if (!hasActiveDocument()) return result;
+
+    KisResourceModel model(ResourceType::PaintOpPresets);
+    const QString needle = filter.trimmed();
+    for (int row = 0; row < model.rowCount(); ++row) {
+        const QModelIndex index = model.index(row, 0);
+        const QString name = index.data(Qt::UserRole + KisAbstractResourceModel::Name).toString();
+        if (!needle.isEmpty() && !name.contains(needle, Qt::CaseInsensitive)) continue;
+
+        QVariantMap item;
+        item.insert(QStringLiteral("id"),
+                    index.data(Qt::UserRole + KisAbstractResourceModel::Id).toInt());
+        item.insert(QStringLiteral("name"), name);
+        result.append(item);
+    }
+    return result;
+}
+
+bool KisMobileBridge::activateBrushPreset(int resourceId) const
+{
+    if (!hasActiveDocument() || resourceId <= 0) return false;
+
+    KisResourceModel model(ResourceType::PaintOpPresets);
+    const QModelIndex index = model.indexForResourceId(resourceId);
+    if (!index.isValid()) return false;
+
+    KisPaintOpPresetSP preset = model.resourceForIndex(index).dynamicCast<KisPaintOpPreset>();
+    if (!preset) return false;
+
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    resources->setPaintOpPreset(preset);
+    return true;
+}
+
+QVariantList KisMobileBridge::layers() const
+{
+    QVariantList result;
+    if (!hasActiveDocument()) return result;
+
+    KisImageSP image = m_mainWindow->activeView()->image();
+    if (!image || !image->root()) return result;
+
+    KisNodeSP active = m_mainWindow->viewManager()->activeNode();
+    std::function<void(KisNodeSP)> appendChildren = [&](KisNodeSP parent) {
+        for (KisNodeSP node = parent ? parent->firstChild() : KisNodeSP();
+             node;
+             node = node->nextSibling()) {
+            QVariantMap item;
+            item.insert(QStringLiteral("id"),
+                        QVariant::fromValue<qulonglong>(
+                            reinterpret_cast<quintptr>(node.data())));
+            item.insert(QStringLiteral("name"), node->name());
+            item.insert(QStringLiteral("visible"), node->visible());
+            item.insert(QStringLiteral("active"), node == active);
+            result.append(item);
+            appendChildren(node);
+        }
+    };
+    appendChildren(image->root());
+    return result;
+}
+
+static KisNodeSP findMobileNode(KisImageSP image, qulonglong id)
+{
+    if (!image || !image->root() || !id) return KisNodeSP();
+
+    KisNodeSP found;
+    std::function<void(KisNodeSP)> visit = [&](KisNodeSP parent) {
+        for (KisNodeSP node = parent ? parent->firstChild() : KisNodeSP();
+             node && !found;
+             node = node->nextSibling()) {
+            if (reinterpret_cast<quintptr>(node.data()) == static_cast<quintptr>(id)) {
+                found = node;
+                return;
+            }
+            visit(node);
+        }
+    };
+    visit(image->root());
+    return found;
+}
+
+bool KisMobileBridge::activateLayer(qulonglong id) const
+{
+    if (!hasActiveDocument()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node) return false;
+    m_mainWindow->viewManager()->nodeManager()->slotUiActivatedNode(node);
+    return true;
+}
+
+bool KisMobileBridge::setLayerVisible(qulonglong id, bool visible) const
+{
+    if (!hasActiveDocument()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node) return false;
+    node->setVisible(visible);
+    m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
+    return true;
+}
+
+bool KisMobileBridge::renameLayer(qulonglong id, const QString &name) const
+{
+    if (!hasActiveDocument() || name.trimmed().isEmpty()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node) return false;
+    m_mainWindow->viewManager()->nodeManager()->setNodeName(node, name.trimmed());
+    return true;
+}
+
+bool KisMobileBridge::removeLayer(qulonglong id) const
+{
+    if (!hasActiveDocument()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node) return false;
+    m_mainWindow->viewManager()->nodeManager()->removeSingleNode(node);
+    return true;
+}
+
+bool KisMobileBridge::addPaintLayer() const
+{
+    if (!hasActiveDocument()) return false;
+    return !m_mainWindow->viewManager()->nodeManager()->createPaintLayer().isNull();
 }

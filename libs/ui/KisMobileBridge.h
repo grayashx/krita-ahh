@@ -8,6 +8,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QVariantList>
 
 #include "kritaui_export.h"
 
@@ -37,6 +38,15 @@ public:
     Q_INVOKABLE bool openRecentDocument(int index) const;
     Q_INVOKABLE bool saveDocument(bool exportImage) const;
     Q_INVOKABLE void showHomeScreen() const;
+
+    Q_INVOKABLE QVariantList brushPresets(const QString &filter = QString()) const;
+    Q_INVOKABLE bool activateBrushPreset(int resourceId) const;
+    Q_INVOKABLE QVariantList layers() const;
+    Q_INVOKABLE bool activateLayer(qulonglong id) const;
+    Q_INVOKABLE bool setLayerVisible(qulonglong id, bool visible) const;
+    Q_INVOKABLE bool renameLayer(qulonglong id, const QString &name) const;
+    Q_INVOKABLE bool removeLayer(qulonglong id) const;
+    Q_INVOKABLE bool addPaintLayer() const;
 
 Q_SIGNALS:
     void documentStateChanged();

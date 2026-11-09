@@ -243,7 +243,8 @@ KisView::KisView(KisDocument *document, KisViewManager *viewManager, QWidget *pa
         static_cast<QObject *>(viewManager->mainWindow()->mobileBridge()));
     mobileControls->setClearColor(QColor(QStringLiteral("#111216")));
     mobileControls->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    mobileControls->setFixedHeight(132);
+    mobileControls->setMinimumHeight(132);
+    mobileControls->setMaximumHeight(340);
     mobileControls->setSource(QUrl(QStringLiteral("qrc:/mobile-ui/qml/WorkspaceBar.qml")));
 
     QVBoxLayout *mobileLayout = new QVBoxLayout(this);
