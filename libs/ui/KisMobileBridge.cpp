@@ -116,6 +116,53 @@ bool KisMobileBridge::setForegroundColor(const QString &colorName) const
     return true;
 }
 
+
+
+bool KisMobileBridge::setBackgroundColor(const QString &colorName) const
+{
+    if (!hasActiveDocument()) return false;
+    const QColor color(colorName);
+    if (!color.isValid()) return false;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    KoColor background = resources->bgColor();
+    background.fromQColor(color);
+    resources->setBGColor(background);
+    return true;
+}
+
+QString KisMobileBridge::foregroundColor() const
+{
+    if (!hasActiveDocument()) return QStringLiteral("#000000");
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return QStringLiteral("#000000");
+    QColor color;
+    resources->fgColor().toQColor(&color);
+    return color.name(QColor::HexRgb);
+}
+
+QString KisMobileBridge::backgroundColor() const
+{
+    if (!hasActiveDocument()) return QStringLiteral("#ffffff");
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return QStringLiteral("#ffffff");
+    QColor color;
+    resources->bgColor().toQColor(&color);
+    return color.name(QColor::HexRgb);
+}
+
+bool KisMobileBridge::swapColors() const
+{
+    if (!hasActiveDocument()) return false;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    const KoColor foreground = resources->fgColor();
+    const KoColor background = resources->bgColor();
+    resources->setFGColor(background);
+    resources->setBGColor(foreground);
+    return true;
+}
+
 bool KisMobileBridge::setEraserMode(bool enabled) const
 {
     if (!hasActiveDocument()) return false;
@@ -242,6 +289,8 @@ QVariantList KisMobileBridge::layers() const
                             reinterpret_cast<quintptr>(node.data())));
             item.insert(QStringLiteral("name"), node->name());
             item.insert(QStringLiteral("visible"), node->visible());
+            item.insert(QStringLiteral("opacity"), node->percentOpacity());
+            item.insert(QStringLiteral("locked"), node->userLocked());
             item.insert(QStringLiteral("active"), node == active);
             result.append(item);
             appendChildren(node);
@@ -312,4 +361,39 @@ bool KisMobileBridge::addPaintLayer() const
 {
     if (!hasActiveDocument()) return false;
     return !m_mainWindow->viewManager()->nodeManager()->createPaintLayer().isNull();
+}
+
+
+bool KisMobileBridge::setLayerOpacity(qulonglong id, qreal opacityPercent) const
+{
+    if (!hasActiveDocument()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node) return false;
+    const int opacity = qBound(0, qRound(qBound<qreal>(0.0, opacityPercent, 100.0) * 2.55), 255);
+    m_mainWindow->viewManager()->nodeManager()->setNodeOpacity(node, opacity);
+    return true;
+}
+
+bool KisMobileBridge::setLayerLocked(qulonglong id, bool locked) const
+{
+    if (!hasActiveDocument()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node) return false;
+    node->setUserLocked(locked);
+    m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
+    return true;
+}
+
+bool KisMobileBridge::raiseLayer(qulonglong id) const
+{
+    if (!activateLayer(id)) return false;
+    m_mainWindow->viewManager()->nodeManager()->raiseNode();
+    return true;
+}
+
+bool KisMobileBridge::lowerLayer(qulonglong id) const
+{
+    if (!activateLayer(id)) return false;
+    m_mainWindow->viewManager()->nodeManager()->lowerNode();
+    return true;
 }
