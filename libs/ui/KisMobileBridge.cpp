@@ -7,8 +7,13 @@
 
 #include "KisMainWindow.h"
 #include "KisView.h"
+#include "KisViewManager.h"
+#include "kis_canvas_resource_provider.h"
+
+#include <KoColor.h>
 
 #include <QAction>
+#include <QColor>
 #include <kactioncollection.h>
 
 KisMobileBridge::KisMobileBridge(KisMainWindow *mainWindow)
@@ -52,4 +57,44 @@ bool KisMobileBridge::hasActiveDocument() const
 {
     return m_mainWindow && m_mainWindow->activeView()
         && m_mainWindow->activeView()->document();
+}
+
+bool KisMobileBridge::setBrushSize(qreal size) const
+{
+    if (!hasActiveDocument()) return false;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    resources->setSize(qBound<qreal>(0.01, size, 100000.0));
+    return true;
+}
+
+bool KisMobileBridge::setBrushOpacity(qreal opacityPercent) const
+{
+    if (!hasActiveDocument()) return false;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    resources->setOpacity(qBound<qreal>(0.0, opacityPercent, 100.0) / 100.0);
+    return true;
+}
+
+bool KisMobileBridge::setForegroundColor(const QString &colorName) const
+{
+    if (!hasActiveDocument()) return false;
+    const QColor color(colorName);
+    if (!color.isValid()) return false;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    KoColor foreground = resources->fgColor();
+    foreground.fromQColor(color);
+    resources->setFGColor(foreground);
+    return true;
+}
+
+bool KisMobileBridge::setEraserMode(bool enabled) const
+{
+    if (!hasActiveDocument()) return false;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    resources->setEraserMode(enabled);
+    return true;
 }
