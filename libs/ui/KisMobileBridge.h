@@ -46,14 +46,14 @@ public:
     Q_INVOKABLE QVariantList brushPresets(const QString &filter = QString()) const;
     Q_INVOKABLE bool activateBrushPreset(int resourceId) const;
     Q_INVOKABLE QVariantList layers() const;
-    Q_INVOKABLE bool activateLayer(qulonglong id) const;
-    Q_INVOKABLE bool setLayerVisible(qulonglong id, bool visible) const;
-    Q_INVOKABLE bool setLayerOpacity(qulonglong id, qreal opacityPercent) const;
-    Q_INVOKABLE bool setLayerLocked(qulonglong id, bool locked) const;
-    Q_INVOKABLE bool raiseLayer(qulonglong id) const;
-    Q_INVOKABLE bool lowerLayer(qulonglong id) const;
-    Q_INVOKABLE bool renameLayer(qulonglong id, const QString &name) const;
-    Q_INVOKABLE bool removeLayer(qulonglong id) const;
+    Q_INVOKABLE bool activateLayer(const QString &id) const;
+    Q_INVOKABLE bool setLayerVisible(const QString &id, bool visible) const;
+    Q_INVOKABLE bool setLayerOpacity(const QString &id, qreal opacityPercent) const;
+    Q_INVOKABLE bool setLayerLocked(const QString &id, bool locked) const;
+    Q_INVOKABLE bool raiseLayer(const QString &id) const;
+    Q_INVOKABLE bool lowerLayer(const QString &id) const;
+    Q_INVOKABLE bool renameLayer(const QString &id, const QString &name) const;
+    Q_INVOKABLE bool removeLayer(const QString &id) const;
     Q_INVOKABLE bool addPaintLayer() const;
 
 Q_SIGNALS:
