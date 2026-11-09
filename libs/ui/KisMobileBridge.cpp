@@ -63,6 +63,20 @@ bool KisMobileBridge::hasActiveDocument() const
         && m_mainWindow->activeView()->document();
 }
 
+qreal KisMobileBridge::brushSize() const
+{
+    if (!hasActiveDocument()) return 18.0;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    return resources ? resources->size() : 18.0;
+}
+
+qreal KisMobileBridge::brushOpacity() const
+{
+    if (!hasActiveDocument()) return 100.0;
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    return resources ? resources->opacity() * 100.0 : 100.0;
+}
+
 bool KisMobileBridge::setBrushSize(qreal size) const
 {
     if (!hasActiveDocument()) return false;
@@ -144,4 +158,20 @@ bool KisMobileBridge::openRecentDocument(int index) const
 
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
     return m_mainWindow->openDocument(path, KisMainWindow::None);
+}
+
+bool KisMobileBridge::saveDocument(bool exportImage) const
+{
+    if (!hasActiveDocument()) return false;
+    return m_mainWindow->saveDocument(
+        m_mainWindow->activeView()->document(),
+        false,
+        exportImage);
+}
+
+void KisMobileBridge::showHomeScreen() const
+{
+    if (m_mainWindow) {
+        m_mainWindow->showWelcomeScreen(true);
+    }
 }
