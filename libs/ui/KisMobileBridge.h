@@ -33,6 +33,8 @@ public:
     Q_INVOKABLE bool setEraserMode(bool enabled) const;
     Q_INVOKABLE bool setActiveTool(const QString &toolName) const;
     Q_INVOKABLE bool openRecentDocument(int index) const;
+    Q_INVOKABLE bool saveDocument(bool exportImage) const;
+    Q_INVOKABLE void showHomeScreen() const;
 
 Q_SIGNALS:
     void documentStateChanged();
