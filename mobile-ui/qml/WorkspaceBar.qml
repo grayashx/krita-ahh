@@ -6,8 +6,6 @@ Item {
     id: root
     implicitHeight: 132
 
-    property var kritaBridge: null
-
     Rectangle {
         anchors.fill: parent
         color: "#17191f"
@@ -27,7 +25,7 @@ Item {
 
                 ToolButton {
                     text: "‹ Home"
-                    onClicked: if (root.kritaBridge) root.kritaBridge.showHomeScreen()
+                    onClicked: if (kritaBridge) kritaBridge.showHomeScreen()
                 }
                 Label {
                     text: "Krita"
@@ -37,19 +35,19 @@ Item {
                 }
                 ToolButton {
                     text: "↶"
-                    onClicked: if (root.kritaBridge) root.kritaBridge.triggerAction("edit_undo")
+                    onClicked: if (kritaBridge) kritaBridge.triggerAction("edit_undo")
                 }
                 ToolButton {
                     text: "↷"
-                    onClicked: if (root.kritaBridge) root.kritaBridge.triggerAction("edit_redo")
+                    onClicked: if (kritaBridge) kritaBridge.triggerAction("edit_redo")
                 }
                 ToolButton {
                     text: "Save"
-                    onClicked: if (root.kritaBridge) root.kritaBridge.saveDocument(false)
+                    onClicked: if (kritaBridge) kritaBridge.saveDocument(false)
                 }
                 ToolButton {
                     text: "Export"
-                    onClicked: if (root.kritaBridge) root.kritaBridge.saveDocument(true)
+                    onClicked: if (kritaBridge) kritaBridge.saveDocument(true)
                 }
             }
 
@@ -66,14 +64,14 @@ Item {
                         text: modelData
                         font.pixelSize: 11
                         onClicked: {
-                            if (!root.kritaBridge) return
+                            if (!kritaBridge) return
                             if (modelData === "Eraser") {
-                                root.kritaBridge.setActiveTool("Brush")
-                                root.kritaBridge.setEraserMode(true)
+                                kritaBridge.setActiveTool("Brush")
+                                kritaBridge.setEraserMode(true)
                             } else {
                                 if (modelData === "Brush")
-                                    root.kritaBridge.setEraserMode(false)
-                                root.kritaBridge.setActiveTool(modelData)
+                                    kritaBridge.setEraserMode(false)
+                                kritaBridge.setActiveTool(modelData)
                             }
                         }
                     }
@@ -83,7 +81,7 @@ Item {
                     text: "+ Layer"
                     font.pixelSize: 11
                     Layout.preferredHeight: 29
-                    onClicked: if (root.kritaBridge) root.kritaBridge.triggerAction("add_new_paint_layer")
+                    onClicked: if (kritaBridge) kritaBridge.triggerAction("add_new_paint_layer")
                 }
             }
 
@@ -102,7 +100,7 @@ Item {
                     from: 1
                     to: 500
                     value: 18
-                    onMoved: if (root.kritaBridge) root.kritaBridge.setBrushSize(value)
+                    onMoved: if (kritaBridge) kritaBridge.setBrushSize(value)
                 }
                 Label {
                     text: "Opacity"
@@ -114,7 +112,7 @@ Item {
                     from: 1
                     to: 100
                     value: 100
-                    onMoved: if (root.kritaBridge) root.kritaBridge.setBrushOpacity(value)
+                    onMoved: if (kritaBridge) kritaBridge.setBrushOpacity(value)
                 }
             }
         }
