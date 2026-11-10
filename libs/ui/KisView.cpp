@@ -244,7 +244,7 @@ KisView::KisView(KisDocument *document, KisViewManager *viewManager, QWidget *pa
     mobileControls->setClearColor(QColor(QStringLiteral("#111216")));
     mobileControls->setResizeMode(QQuickWidget::SizeRootObjectToView);
     mobileControls->setMinimumHeight(132);
-    mobileControls->setMaximumHeight(340);
+    mobileControls->setMaximumHeight(410);
     mobileControls->setSource(QUrl(QStringLiteral("qrc:/mobile-ui/qml/WorkspaceBar.qml")));
 
     QVBoxLayout *mobileLayout = new QVBoxLayout(this);

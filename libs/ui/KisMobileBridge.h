@@ -33,6 +33,10 @@ public:
     Q_INVOKABLE bool setBrushSize(qreal size) const;
     Q_INVOKABLE bool setBrushOpacity(qreal opacityPercent) const;
     Q_INVOKABLE bool setForegroundColor(const QString &colorName) const;
+    Q_INVOKABLE bool setBackgroundColor(const QString &colorName) const;
+    Q_INVOKABLE QString foregroundColor() const;
+    Q_INVOKABLE QString backgroundColor() const;
+    Q_INVOKABLE bool swapColors() const;
     Q_INVOKABLE bool setEraserMode(bool enabled) const;
     Q_INVOKABLE bool setActiveTool(const QString &toolName) const;
     Q_INVOKABLE bool openRecentDocument(int index) const;
@@ -42,10 +46,14 @@ public:
     Q_INVOKABLE QVariantList brushPresets(const QString &filter = QString()) const;
     Q_INVOKABLE bool activateBrushPreset(int resourceId) const;
     Q_INVOKABLE QVariantList layers() const;
-    Q_INVOKABLE bool activateLayer(qulonglong id) const;
-    Q_INVOKABLE bool setLayerVisible(qulonglong id, bool visible) const;
-    Q_INVOKABLE bool renameLayer(qulonglong id, const QString &name) const;
-    Q_INVOKABLE bool removeLayer(qulonglong id) const;
+    Q_INVOKABLE bool activateLayer(const QString &id) const;
+    Q_INVOKABLE bool setLayerVisible(const QString &id, bool visible) const;
+    Q_INVOKABLE bool setLayerOpacity(const QString &id, qreal opacityPercent) const;
+    Q_INVOKABLE bool setLayerLocked(const QString &id, bool locked) const;
+    Q_INVOKABLE bool raiseLayer(const QString &id) const;
+    Q_INVOKABLE bool lowerLayer(const QString &id) const;
+    Q_INVOKABLE bool renameLayer(const QString &id, const QString &name) const;
+    Q_INVOKABLE bool removeLayer(const QString &id) const;
     Q_INVOKABLE bool addPaintLayer() const;
 
 Q_SIGNALS:
