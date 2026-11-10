@@ -16,6 +16,8 @@ Item {
     property string activeTool: "Brush"
     property string selectedLayerId: ""
     property string colorTarget: "foreground"
+    property string documentTitle: "Untitled"
+    property bool documentModified: false
     property color foreground: "#000000"
     property color background: "#ffffff"
     property color pickerColor: "#000000"
@@ -44,6 +46,16 @@ Item {
     readonly property var moreTools: ["Pencil", "Path", "Text", "Move"]
 
     implicitHeight: 154 + (activePanel === "" ? 0 : 224)
+
+    function refreshDocumentMetadata() {
+        if (!kritaBridge) {
+            documentTitle = "Untitled"
+            documentModified = false
+            return
+        }
+        documentTitle = kritaBridge.documentTitle()
+        documentModified = kritaBridge.documentModified()
+    }
 
     function refreshColors() {
         if (!kritaBridge) return
@@ -205,21 +217,44 @@ Item {
             root.refreshColors()
             root.refreshRecentColors()
         }
+        function onDocumentMetadataChanged() {
+            root.refreshDocumentMetadata()
+        }
         function onDocumentStateChanged() {
+            root.refreshDocumentMetadata()
             root.refreshColors()
             root.refreshRecentColors()
-            root.refreshBrushTags()
-            root.refreshPresets()
-            root.refreshLayers()
+            // Resource and node catalogues can be large. Refresh only the
+            // panel currently being used, not every hidden panel.
+            if (root.activePanel === "brushes") {
+                root.refreshBrushTags()
+                presetSearchDebounce.restart()
+            }
+            if (root.activePanel === "layers") {
+                root.refreshLayers()
+            }
         }
     }
 
+    Timer {
+        id: presetSearchDebounce
+        interval: 220
+        repeat: false
+        onTriggered: root.refreshPresets()
+    }
+
     Component.onCompleted: {
+        refreshDocumentMetadata()
         refreshColors()
         refreshRecentColors()
-        refreshBrushTags()
-        refreshPresets()
-        refreshLayers()
+    }
+
+    Menu {
+        id: documentActions
+        MenuItem {
+            text: "Save as…"
+            onTriggered: if (kritaBridge) kritaBridge.saveDocumentAs()
+        }
     }
 
     Rectangle {
@@ -257,12 +292,14 @@ Item {
                     ToolTip.text: "Redo"
                 }
                 Label {
-                    text: "Krita"
-                    visible: !root.compactWidth
+                    text: root.documentTitle + (root.documentModified ? "  •" : "")
                     color: "#f0eee9"
                     font.bold: true
-                    font.pixelSize: 12
+                    font.pixelSize: root.compactWidth ? 10 : 12
                     Layout.fillWidth: true
+                    elide: Text.ElideMiddle
+                    ToolTip.visible: hovered
+                    ToolTip.text: root.documentTitle + (root.documentModified ? " (unsaved changes)" : "")
                 }
                 ToolButton {
                     text: root.compactWidth ? "↓" : "Save"
@@ -273,6 +310,14 @@ Item {
                     text: root.compactWidth ? "⇧" : "Export"
                     font.pixelSize: 11
                     onClicked: if (kritaBridge) kritaBridge.saveDocument(true)
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Export a copy"
+                }
+                ToolButton {
+                    text: "⋮"
+                    onClicked: documentActions.open()
+                    ToolTip.visible: hovered
+                    ToolTip.text: "More document actions"
                 }
             }
 
@@ -670,7 +715,7 @@ Item {
                             Layout.preferredHeight: 28
                             font.pixelSize: 11
                             placeholderText: "Search brushes"
-                            onTextChanged: root.refreshPresets()
+                            onTextChanged: presetSearchDebounce.restart()
                         }
 
                         ListView {
