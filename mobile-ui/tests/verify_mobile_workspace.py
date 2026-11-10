@@ -28,6 +28,7 @@ class MobileWorkspaceChecks(unittest.TestCase):
         cls.android_gradle = read("packaging/android/apk/build.gradle")
         cls.android_manifest = read("packaging/android/apk/AndroidManifest.xml")
         cls.android_workflow = read(".github/workflows/build-android-apk.yml")
+        cls.gitlab_ci = read(".gitlab-ci.yml")
         cls.root_cmake = read("CMakeLists.txt")
         cls.menu_actions = read("krita/kritamenu.action")
         cls.mobile_qrc = read("mobile-ui/mobile-ui.qrc")
@@ -164,7 +165,8 @@ class MobileWorkspaceChecks(unittest.TestCase):
 
     def test_android_debug_apk_workflow_uses_native_krita_build_pipeline(self) -> None:
         self.assertIn("workflow_dispatch:", self.android_workflow)
-        self.assertIn("s3.kde.org/ci-vm-images/krita-android-sdk36-2204", self.android_workflow)
+        self.assertIn("storage.kde.org/vm-images/krita-android-sdk36-2204", self.android_workflow)
+        self.assertIn("VM_IMAGE_NAME_ANDROID: 'storage.kde.org/vm-images/krita-android-sdk36-2204'", self.gitlab_ci)
         self.assertIn("run-ci-build.py", self.android_workflow)
         self.assertIn("build-android-package.py", self.android_workflow)
         self.assertIn("KRITACI_ANDROID_PACKAGE_TYPE: debug", self.android_workflow)
