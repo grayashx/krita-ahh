@@ -435,8 +435,6 @@ Item {
                         id: contextualPanelContent
                         width: contextualPanelScroll.width
                         height: contextualPanelScroll.contentHeight
-                        anchors.left: parent.left
-                        anchors.right: parent.right
                         spacing: 4
 
                     // COLOR PICKER
