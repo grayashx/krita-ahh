@@ -133,6 +133,7 @@ Item {
 
     function refreshLayers() {
         layerItems = kritaBridge ? kritaBridge.layers() : []
+        selectedLayerId = ""
         for (var i = 0; i < layerItems.length; ++i) {
             if (layerItems[i].active) {
                 selectedLayerId = layerItems[i].id
