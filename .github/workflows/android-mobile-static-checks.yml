@@ -1,0 +1,44 @@
+name: Android mobile source checks
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/android-mobile-static-checks.yml"
+      - "libs/ui/KisMobileBridge.*"
+      - "libs/ui/KisMainWindow.*"
+      - "libs/ui/KisView.cpp"
+      - "mobile-ui/**"
+      - "krita/data/input/kritadefault.profile"
+      - "packaging/android/apk/AndroidManifest.xml"
+      - "packaging/android/apk/build.gradle"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/android-mobile-static-checks.yml"
+      - "libs/ui/KisMobileBridge.*"
+      - "libs/ui/KisMainWindow.*"
+      - "libs/ui/KisView.cpp"
+      - "mobile-ui/**"
+      - "krita/data/input/kritadefault.profile"
+      - "packaging/android/apk/AndroidManifest.xml"
+      - "packaging/android/apk/build.gradle"
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-source-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify Android mobile workspace contracts
+        run: python3 mobile-ui/tests/verify_mobile_workspace.py
