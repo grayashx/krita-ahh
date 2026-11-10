@@ -31,6 +31,7 @@
 #ifdef Q_OS_ANDROID
 #include <QColor>
 #include <QQmlContext>
+#include <QQmlEngine>
 #include <QQuickWidget>
 #include <QVBoxLayout>
 #endif
