@@ -37,7 +37,7 @@ Item {
     ]
     readonly property var moreTools: ["Pencil", "Path", "Text", "Move"]
 
-    implicitHeight: 150 + (activePanel === "" ? 0 : 260)
+    implicitHeight: 154 + (activePanel === "" ? 0 : 224)
 
     function refreshColors() {
         if (!kritaBridge) return
@@ -415,7 +415,7 @@ Item {
             Rectangle {
                 visible: root.activePanel !== ""
                 Layout.fillWidth: true
-                Layout.preferredHeight: visible ? 260 : 0
+                Layout.preferredHeight: visible ? 224 : 0
                 color: "#22252d"
                 radius: 6
 
