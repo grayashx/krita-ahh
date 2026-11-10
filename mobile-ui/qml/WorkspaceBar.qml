@@ -240,7 +240,7 @@ Item {
         id: presetSearchDebounce
         interval: 220
         repeat: false
-        onTriggered: root.refreshPresets()
+        onTriggered: if (root.activePanel === "brushes") root.refreshPresets()
     }
 
     Component.onCompleted: {
@@ -298,8 +298,6 @@ Item {
                     font.pixelSize: root.compactWidth ? 10 : 12
                     Layout.fillWidth: true
                     elide: Text.ElideMiddle
-                    ToolTip.visible: hovered
-                    ToolTip.text: root.documentTitle + (root.documentModified ? " (unsaved changes)" : "")
                 }
                 ToolButton {
                     text: root.compactWidth ? "↓" : "Save"
