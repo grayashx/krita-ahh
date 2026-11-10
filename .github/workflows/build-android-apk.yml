@@ -6,6 +6,16 @@ on:
       - main
     paths:
       - .github/workflows/build-android-apk.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/build-android-apk.yml
+      - mobile-ui/tests/verify_mobile_workspace.py
+      - mobile-ui/**
+      - libs/ui/**
+      - packaging/android/**
+      - CMakeLists.txt
   workflow_dispatch:
     inputs:
       abi:
@@ -28,7 +38,7 @@ jobs:
     timeout-minutes: 360
     env:
       ANDROID_ABI: ${{ inputs.abi || 'arm64-v8a' }}
-      KDE_ANDROID_IMAGE: s3.kde.org/ci-vm-images/krita-android-sdk36-2204
+      KDE_ANDROID_IMAGE: ""
 
     steps:
       # Keep GitHub's JavaScript actions on the hosted runner. The KDE build
@@ -43,8 +53,33 @@ jobs:
         run: |
           set -euo pipefail
           docker version
-          docker pull "$KDE_ANDROID_IMAGE"
-          docker image inspect "$KDE_ANDROID_IMAGE" >/dev/null
+
+          # KDE's storage.kde.org and s3.kde.org URLs identify VM images, not
+          # Docker Registry endpoints. GitHub-hosted runners need the published
+          # KDE Android builder container from invent-registry.kde.org.
+          candidates=(
+            "invent-registry.kde.org/sysadmin/ci-images/krita-android-builder-sdk36-2204:latest"
+            "invent-registry.kde.org/sysadmin/ci-images/krita-android-builder-sdk34-2204:latest"
+          )
+
+          pulled_image=""
+          for image in "${candidates[@]}"; do
+            echo "Trying KDE Android builder: $image"
+            if docker pull "$image"; then
+              pulled_image="$image"
+              break
+            fi
+            echo "::warning::Could not pull $image; trying the next published KDE builder."
+          done
+
+          if [[ -z "$pulled_image" ]]; then
+            echo "::error::No published KDE Android builder image could be pulled."
+            exit 1
+          fi
+
+          docker image inspect "$pulled_image" >/dev/null
+          echo "KDE_ANDROID_IMAGE=$pulled_image" >> "$GITHUB_ENV"
+          echo "Using KDE Android builder: $pulled_image"
 
       - name: Build APK inside the KDE Android environment
         run: |
