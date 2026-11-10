@@ -109,3 +109,19 @@ See [the Android release checklist](RELEASE_CHECKLIST.md) for the Android
 packaging inputs, version and application-identity checks, signing requirements,
 and the device verification gate. The automated workflow runs source-level
 mobile checks only; it does not build or sign an APK.
+
+## Building an installable APK
+
+Use the manual **Build Android APK** GitHub Actions workflow and select the
+target ABI. It runs the native Krita Android build through the KDE Android
+builder image and then uses Krita's existing `build-android-package.py`
+packaging script. The output is an installable **debug APK** uploaded as a
+workflow artifact; it is not a signed production release.
+
+The Android target requires Qt Quick, Qt Quick Widgets, and Qt Quick Controls 2.
+CMake now treats those modules as required on Android so an incomplete Qt
+toolchain fails during configuration rather than later in the C++ build.
+
+The project is native Qt/Krita, not Tauri. Preserve the native QWidget/OpenGL
+canvas and Krita brush engine; do not introduce a Tauri webview as an alternate
+canvas host.

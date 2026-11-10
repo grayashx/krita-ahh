@@ -914,6 +914,14 @@ if (Qt${QT_MAJOR_VERSION}QuickWidgets_FOUND)
 
 endif()
 
+if (ANDROID)
+    # The Android workspace embeds a QQuickWidget control strip beside Krita's
+    # native canvas, so these Qt modules are required for Android builds.
+    find_package(Qt${QT_MAJOR_VERSION}Quick ${MIN_QT_VERSION} REQUIRED)
+    find_package(Qt${QT_MAJOR_VERSION}QuickWidgets ${MIN_QT_VERSION} REQUIRED)
+    find_package(Qt${QT_MAJOR_VERSION}QuickControls2 ${MIN_QT_VERSION} REQUIRED)
+endif()
+
 
 if (NOT WIN32 AND NOT APPLE AND NOT ANDROID AND NOT HAIKU)
     if (QT_MAJOR_VERSION STREQUAL "5")

@@ -70,6 +70,11 @@ independent release build recipe.
 ## 3. Required automated checks
 
 - [ ] GitHub Actions mobile source checks pass on the release commit.
+- [ ] Run the manual **Build Android APK** workflow for each target ABI.
+- [ ] Confirm the workflow builds the checked-out source revision, completes
+      the native Android CMake/Krita build, and uploads an APK artifact.
+- [ ] Install that debug APK on a physical device and complete the device
+      acceptance matrix below.
 - [ ] A full native Android CMake/Krita build completes for each ABI being
       distributed.
 - [ ] The APK packaging task completes using the install tree from that same
@@ -114,7 +119,8 @@ Complete on at least one phone and one tablet, each in portrait and landscape:
 
 ## 5. Release decision
 
-A release candidate is ready only when the native Android build, signed APK,
-device acceptance matrix, application identity, versioning, and licensing/
-branding review are complete. Static source checks alone are not a release
-approval.
+A debug APK from the GitHub Actions workflow is a test build, not a release
+candidate. A release candidate is ready only when the native Android build,
+signed release APK, device acceptance matrix, application identity, versioning,
+and licensing/branding review are complete. Static source checks or a successful
+debug APK build alone are not a release approval.

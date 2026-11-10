@@ -27,6 +27,12 @@ class MobileWorkspaceChecks(unittest.TestCase):
         cls.document_header = read("libs/ui/KisDocument.h")
         cls.android_gradle = read("packaging/android/apk/build.gradle")
         cls.android_manifest = read("packaging/android/apk/AndroidManifest.xml")
+        cls.android_workflow = read(".github/workflows/build-android-apk.yml")
+        cls.root_cmake = read("CMakeLists.txt")
+        cls.menu_actions = read("krita/kritamenu.action")
+        cls.mobile_qrc = read("mobile-ui/mobile-ui.qrc")
+        cls.home_qml = read("mobile-ui/qml/Main.qml")
+        cls.main_window_cpp = read("libs/ui/KisMainWindow.cpp")
         cls.view_cpp = read("libs/ui/KisView.cpp")
         cls.canvas_cpp = read("libs/ui/opengl/kis_opengl_canvas2.cpp")
         cls.input_cpp = read("libs/ui/input/kis_input_manager.cpp")
@@ -139,6 +145,32 @@ class MobileWorkspaceChecks(unittest.TestCase):
         self.assertRegex(self.android_gradle, r"versionCode\s+")
         self.assertIn("release {", self.android_gradle)
 
+    def test_android_requires_qt_quick_host_dependencies(self) -> None:
+        for component in ("Quick", "QuickWidgets", "QuickControls2"):
+            with self.subTest(component=component):
+                requirement = "find_package(Qt${QT_MAJOR_VERSION}" + component + " ${MIN_QT_VERSION} REQUIRED)"
+                self.assertIn(requirement, self.root_cmake)
+
+    def test_mobile_home_actions_and_qml_resources_are_registered(self) -> None:
+        self.assertIn('<Action name="file_new">', self.menu_actions)
+        self.assertIn('<Action name="file_open">', self.menu_actions)
+        self.assertIn('root.dispatch("file_new")', self.home_qml)
+        self.assertIn('root.dispatch("file_open")', self.home_qml)
+        self.assertIn('root.dispatch("openRecent", index)', self.home_qml)
+        self.assertIn('alias="Main.qml"', self.mobile_qrc)
+        self.assertIn('alias="WorkspaceBar.qml"', self.mobile_qrc)
+        self.assertIn('qrc:/mobile-ui/qml/Main.qml', self.main_window_cpp)
+        self.assertIn('qrc:/mobile-ui/qml/WorkspaceBar.qml', self.view_cpp)
+
+    def test_android_debug_apk_workflow_uses_native_krita_build_pipeline(self) -> None:
+        self.assertIn("workflow_dispatch:", self.android_workflow)
+        self.assertIn("s3.kde.org/ci-vm-images/krita-android-sdk36-2204", self.android_workflow)
+        self.assertIn("run-ci-build.py", self.android_workflow)
+        self.assertIn("build-android-package.py", self.android_workflow)
+        self.assertIn("KRITACI_ANDROID_PACKAGE_TYPE: debug", self.android_workflow)
+        self.assertIn("actions/upload-artifact@v4", self.android_workflow)
+        self.assertIn("arm64-v8a", self.android_workflow)
+        self.assertNotIn("Tauri", self.android_workflow)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

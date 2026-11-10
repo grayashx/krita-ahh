@@ -1,0 +1,123 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      abi:
+        description: Android ABI to build
+        required: true
+        type: choice
+        default: arm64-v8a
+        options:
+          - arm64-v8a
+          - x86_64
+          - armeabi-v7a
+
+permissions:
+  contents: read
+
+jobs:
+  build-android-apk:
+    name: Build debug APK (${{ inputs.abi }})
+    runs-on: ubuntu-24.04
+    container:
+      image: s3.kde.org/ci-vm-images/krita-android-sdk36-2204
+    timeout-minutes: 360
+    env:
+      KDECI_ANDROID_ABI: ${{ inputs.abi }}
+      KDECI_BUILD_TYPE: Release
+      KDECI_GITLAB_SERVER: https://invent.kde.org/
+      KDECI_COMPRESS_PACKAGES_ON_DOWNLOAD: "False"
+      KDECI_SKIP_ECM_ANDROID_TOOLCHAIN: "True"
+      KDECI_WORKDIR_PATH: /tmp/wd
+      KRITACI_ANDROID_PACKAGE_TYPE: debug
+      KRITACI_SKIP_UPLOAD_NIGHTLY_PACKAGE: "True"
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out this source revision
+        uses: actions/checkout@v4
+
+      - name: Build and package Krita for Android
+        run: |
+          set -euo pipefail
+
+          # Match the environment setup used by Krita's Android CI image.
+          test -f /var/lib/ci-files/setup-environment.sh
+          source /var/lib/ci-files/setup-environment.sh
+          : "${ANDROID_HOME:?Android SDK path is missing from the builder image}"
+          : "${KDECI_ANDROID_NDK_ROOT:?Android NDK path is missing from the builder image}"
+
+          export CI_PROJECT_DIR="$GITHUB_WORKSPACE"
+          # Use the upstream Krita dependency cache; compile the exact source
+          # revision checked out from this GitHub repository.
+          export CI_PROJECT_NAME=krita
+          export CI_COMMIT_REF_NAME=master
+          export CI_COMMIT_SHORT_SHA="${GITHUB_SHA:0:7}"
+          export KDECI_REPO_METADATA_PATH="$GITHUB_WORKSPACE/krita-deps-management/repo-metadata"
+          export KDECI_EXTRA_CMAKE_ARGS="-DHIDE_SAFE_ASSERTS=OFF -DBUILD_TESTING=ON"
+          export CMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/krita-deps-management/tools/android-toolchain-krita.cmake"
+          export KRITACI_ANDROID_PACKAGE_TYPE=debug
+          export KRITACI_SKIP_UPLOAD_NIGHTLY_PACKAGE=True
+          export KDECI_WORKDIR_PATH=/tmp/wd
+          export KDECI_PACKAGE_PROJECT="teams/ci-artifacts/krita-android-$KDECI_ANDROID_ABI"
+          export KDECI_CC_CACHE="/mnt/krita-android/$KDECI_ANDROID_ABI/caches/"
+          export KDECI_CACHE_PATH="/mnt/krita-android/$KDECI_ANDROID_ABI/artifacts/"
+
+          mkdir -p "$KDECI_WORKDIR_PATH" "$KDECI_CC_CACHE" "$KDECI_CACHE_PATH"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+          git clone --depth 1 --branch master \
+            https://invent.kde.org/packaging/krita-deps-management.git \
+            krita-deps-management
+          git clone --depth 1 \
+            https://invent.kde.org/packaging/krita-ci-utilities.git \
+            krita-deps-management/ci-utilities
+
+          python3 -m venv venv --upgrade-deps
+          source venv/bin/activate
+          python -m pip install -r krita-deps-management/requirements.txt
+          # Keep the venv tools on PATH as in the upstream Android CI setup.
+          source venv/bin/activate
+          unset VIRTUAL_ENV
+
+          python3 -u krita-deps-management/tools/replace-branch-in-seed-file.py \
+            krita-deps-management/latest/krita-deps.yml \
+            -p -o branch-corrected-deps.yml -d master
+          python3 -u krita-deps-management/tools/generate-deps-file.py \
+            -s branch-corrected-deps.yml -o .kde-ci.yml
+
+          python3 -u krita-deps-management/ci-utilities/run-ci-build.py \
+            --project "$CI_PROJECT_NAME" \
+            --branch "$CI_COMMIT_REF_NAME" \
+            --platform "Android/$KDECI_ANDROID_ABI/Qt5/Shared" \
+            --only-build --skip-publishing 2>&1 | tee build-krita.log
+
+          python3 -u build-tools/ci-scripts/build-android-package.py \
+            2>&1 | tee build-apk.log
+
+          mkdir -p "$GITHUB_WORKSPACE/_packaging"
+          compgen -G "$KDECI_WORKDIR_PATH/krita/_packaging/*.apk" >/dev/null
+          cp -v "$KDECI_WORKDIR_PATH"/krita/_packaging/*.apk \
+            "$GITHUB_WORKSPACE/_packaging/"
+
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: krita-android-debug-${{ inputs.abi }}-${{ github.sha }}
+          path: _packaging/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: krita-android-build-logs-${{ github.run_id }}
+          path: |
+            build-krita.log
+            build-apk.log
+          if-no-files-found: ignore
+          retention-days: 7
