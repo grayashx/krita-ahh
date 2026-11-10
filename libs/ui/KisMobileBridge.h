@@ -49,7 +49,6 @@ public:
     Q_INVOKABLE QVariantList brushPresets(const QString &filter = QString(), const QString &tagUrl = QString()) const;
     Q_INVOKABLE bool activateBrushPreset(int resourceId) const;
     Q_INVOKABLE bool setBrushPresetFavorite(int resourceId, bool favorite) const;
-    Q_INVOKABLE bool renameBrushPreset(int resourceId, const QString &name) const;
     Q_INVOKABLE bool hideBrushPreset(int resourceId) const;
     Q_INVOKABLE QVariantList layers() const;
     Q_INVOKABLE bool activateLayer(const QString &id) const;
