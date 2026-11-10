@@ -8,6 +8,7 @@
 #include "KisMainWindow.h"
 #include "KisView.h"
 #include "KisViewManager.h"
+#include "KisDocument.h"
 #include "KisRecentDocumentsModelWrapper.h"
 #include "kis_node_manager.h"
 #include "kis_node.h"
@@ -44,16 +45,54 @@ KisMobileBridge::KisMobileBridge(KisMainWindow *mainWindow)
     if (m_mainWindow) {
         connect(m_mainWindow, &KisMainWindow::activeViewChanged, this, [this]() {
             connectColorResourceSignals();
+            connectActiveDocumentSignals();
             Q_EMIT documentStateChanged();
             Q_EMIT colorsChanged();
         });
         connect(m_mainWindow, &KisMainWindow::loadCompleted, this, [this]() {
             connectColorResourceSignals();
+            connectActiveDocumentSignals();
             Q_EMIT documentStateChanged();
             Q_EMIT colorsChanged();
         });
         connectColorResourceSignals();
+        connectActiveDocumentSignals();
     }
+}
+
+void KisMobileBridge::connectActiveDocumentSignals()
+{
+    KisDocument *document = nullptr;
+    if (m_mainWindow && m_mainWindow->activeView()) {
+        document = m_mainWindow->activeView()->document();
+    }
+
+    if (m_connectedDocument == document) {
+        return;
+    }
+
+    if (m_connectedDocument) {
+        disconnect(m_connectedDocument.data(), nullptr, this, nullptr);
+    }
+
+    m_connectedDocument = document;
+    if (document) {
+        connect(document, &KisDocument::modified, this, [this](bool) {
+            Q_EMIT documentMetadataChanged();
+        });
+        connect(document, &KisDocument::sigPathChanged, this, [this](const QString &) {
+            Q_EMIT documentMetadataChanged();
+        });
+        connect(document, &KisDocument::sigSavingFinished, this, [this](const QString &) {
+            Q_EMIT documentMetadataChanged();
+        });
+        connect(document, &QObject::destroyed, this, [this]() {
+            m_connectedDocument = nullptr;
+            Q_EMIT documentMetadataChanged();
+        });
+    }
+
+    Q_EMIT documentMetadataChanged();
 }
 
 void KisMobileBridge::connectColorResourceSignals()
@@ -116,6 +155,21 @@ bool KisMobileBridge::hasActiveDocument() const
 {
     return m_mainWindow && m_mainWindow->activeView()
         && m_mainWindow->activeView()->document();
+}
+
+QString KisMobileBridge::documentTitle() const
+{
+    if (!hasActiveDocument()) {
+        return QStringLiteral("Untitled");
+    }
+
+    const QString title = m_mainWindow->activeView()->document()->caption().trimmed();
+    return title.isEmpty() ? QStringLiteral("Untitled") : title;
+}
+
+bool KisMobileBridge::documentModified() const
+{
+    return hasActiveDocument() && m_mainWindow->activeView()->document()->isModified();
 }
 
 qreal KisMobileBridge::brushSize() const
@@ -315,6 +369,15 @@ bool KisMobileBridge::saveDocument(bool exportImage) const
         m_mainWindow->activeView()->document(),
         false,
         exportImage);
+}
+
+bool KisMobileBridge::saveDocumentAs() const
+{
+    if (!hasActiveDocument()) return false;
+    return m_mainWindow->saveDocument(
+        m_mainWindow->activeView()->document(),
+        true,
+        false);
 }
 
 void KisMobileBridge::showHomeScreen() const

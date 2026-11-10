@@ -24,6 +24,9 @@ class MobileWorkspaceChecks(unittest.TestCase):
         cls.qml = read("mobile-ui/qml/WorkspaceBar.qml")
         cls.bridge_h = read("libs/ui/KisMobileBridge.h")
         cls.bridge_cpp = read("libs/ui/KisMobileBridge.cpp")
+        cls.document_header = read("libs/ui/KisDocument.h")
+        cls.android_gradle = read("packaging/android/apk/build.gradle")
+        cls.android_manifest = read("packaging/android/apk/AndroidManifest.xml")
         cls.view_cpp = read("libs/ui/KisView.cpp")
         cls.canvas_cpp = read("libs/ui/opengl/kis_opengl_canvas2.cpp")
         cls.input_cpp = read("libs/ui/input/kis_input_manager.cpp")
@@ -92,6 +95,49 @@ class MobileWorkspaceChecks(unittest.TestCase):
     def test_existing_touch_and_pen_regressions_remain_in_input_suite(self) -> None:
         self.assertIn("testTouchMoves", self.input_tests)
         self.assertIn("testTouchOverriddenByTablet", self.input_tests)
+
+    def test_document_metadata_and_save_as_use_native_document_apis(self) -> None:
+        for method in ("documentTitle", "documentModified", "saveDocumentAs"):
+            with self.subTest(method=method):
+                self.assertRegex(self.bridge_h, rf"Q_INVOKABLE\s+[^;]+\b{method}\s*\(")
+                self.assertIn(f"KisMobileBridge::{method}(", self.bridge_cpp)
+
+        self.assertIn("void documentMetadataChanged();", self.bridge_h)
+        self.assertIn("QPointer<KisDocument> m_connectedDocument", self.bridge_h)
+        self.assertIn("void modified(bool);", self.document_header)
+        self.assertIn("void sigPathChanged(const QString &path);", self.document_header)
+        self.assertIn("void sigSavingFinished(const QString &filePath);", self.document_header)
+        self.assertIn("&KisDocument::modified", self.bridge_cpp)
+        self.assertIn("&KisDocument::sigPathChanged", self.bridge_cpp)
+        self.assertIn("&KisDocument::sigSavingFinished", self.bridge_cpp)
+        self.assertIn("->caption()", self.bridge_cpp)
+        self.assertIn("->isModified()", self.bridge_cpp)
+        self.assertIn("m_mainWindow->saveDocument(", self.bridge_cpp)
+
+    def test_workspace_displays_live_document_metadata_and_save_as(self) -> None:
+        self.assertIn("root.documentTitle", self.qml)
+        self.assertIn("root.documentModified", self.qml)
+        self.assertIn("onDocumentMetadataChanged()", self.qml)
+        self.assertIn("kritaBridge.saveDocumentAs()", self.qml)
+        self.assertIn('text: "Save as…"', self.qml)
+
+    def test_brush_catalogue_search_is_debounced_and_contextual(self) -> None:
+        self.assertIn("interval: 220", self.qml)
+        self.assertIn("onTextChanged: presetSearchDebounce.restart()", self.qml)
+        self.assertIn('root.activePanel === "brushes"', self.qml)
+        self.assertIn('root.activePanel === "layers"', self.qml)
+
+    def test_android_release_identity_and_build_configuration_are_explicit(self) -> None:
+        namespace = re.search(r'namespace\s*=\s*"([^"]+)"', self.android_gradle)
+        manifest_package = re.search(r'<manifest[^>]*package="([^"]+)"', self.android_manifest)
+        self.assertIsNotNone(namespace)
+        self.assertIsNotNone(manifest_package)
+        self.assertEqual(namespace.group(1), manifest_package.group(1))
+        self.assertRegex(self.android_gradle, r"minSdkVersion\s+\d+")
+        self.assertRegex(self.android_gradle, r"targetSdkVersion\s+\d+")
+        self.assertRegex(self.android_gradle, r'versionName\s+"[^"]+"')
+        self.assertRegex(self.android_gradle, r"versionCode\s+")
+        self.assertIn("release {", self.android_gradle)
 
 
 if __name__ == "__main__":

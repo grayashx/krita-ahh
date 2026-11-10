@@ -7,6 +7,7 @@
 #define KIS_MOBILE_BRIDGE_H
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <QVariantList>
 
@@ -14,6 +15,7 @@
 
 class KisMainWindow;
 class KisCanvasResourceProvider;
+class KisDocument;
 
 /**
  * Thin QObject adapter for invoking existing Krita window actions from QML.
@@ -29,6 +31,8 @@ public:
     Q_INVOKABLE bool triggerAction(const QString &actionId) const;
     Q_INVOKABLE bool isActionEnabled(const QString &actionId) const;
     Q_INVOKABLE bool hasActiveDocument() const;
+    Q_INVOKABLE QString documentTitle() const;
+    Q_INVOKABLE bool documentModified() const;
     Q_INVOKABLE qreal brushSize() const;
     Q_INVOKABLE qreal brushOpacity() const;
     Q_INVOKABLE bool setBrushSize(qreal size) const;
@@ -43,6 +47,7 @@ public:
     Q_INVOKABLE bool setActiveTool(const QString &toolName) const;
     Q_INVOKABLE bool openRecentDocument(int index) const;
     Q_INVOKABLE bool saveDocument(bool exportImage) const;
+    Q_INVOKABLE bool saveDocumentAs() const;
     Q_INVOKABLE void showHomeScreen() const;
 
     Q_INVOKABLE QVariantList brushTags() const;
@@ -73,13 +78,16 @@ public:
 
 Q_SIGNALS:
     void documentStateChanged();
+    void documentMetadataChanged();
     void colorsChanged();
 
 private:
     void connectColorResourceSignals();
+    void connectActiveDocumentSignals();
 
     KisMainWindow *m_mainWindow {nullptr};
     KisCanvasResourceProvider *m_connectedColorResources {nullptr};
+    QPointer<KisDocument> m_connectedDocument;
 };
 
 #endif // KIS_MOBILE_BRIDGE_H
