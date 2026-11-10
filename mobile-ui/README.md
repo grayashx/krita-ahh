@@ -88,3 +88,24 @@ This execution environment has no Android SDK/NDK or connected device. The chang
 - Finger input while a stylus is hovering or drawing, including palm rejection and cancellation.
 - Undo/redo after stylus strokes, and switching between canvas tools and QML controls.
 - Confirm the canvas remains usable with each contextual panel open on short screens.
+
+## Document workflow and performance
+
+The mobile document bar reads the active document caption and modified flag from
+Krita's current `KisDocument`. These values are refreshed from native document
+signals; the mobile UI does not maintain a separate save state. Save, Save As,
+and Export continue through Krita's existing document-save implementation.
+Opening files, creating documents, and opening recent files use Krita's native
+actions and recent-document model.
+
+Brush preset lookup is deferred until the brush panel is opened. Search changes
+are debounced, and document changes refresh only the visible resource panel.
+This avoids rebuilding the preset catalogue on every keystroke or refreshing
+hidden layer and brush panels unnecessarily.
+
+## Release preparation
+
+See [the Android release checklist](RELEASE_CHECKLIST.md) for the Android
+packaging inputs, version and application-identity checks, signing requirements,
+and the device verification gate. The automated workflow runs source-level
+mobile checks only; it does not build or sign an APK.
