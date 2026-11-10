@@ -1,6 +1,6 @@
 # Android mobile UI
 
-The Android build uses a touch-first QML home screen and a hybrid painting workspace.
+The Android build uses a touch-first QML home screen and a compact, task-focused painting workspace.
 
 ## Home screen
 
@@ -12,31 +12,39 @@ The Android build uses a touch-first QML home screen and a hybrid painting works
 
 ## Painting workspace
 
-Each Android `KisView` keeps Krita's existing `KisCanvasController` and OpenGL canvas as the actual painting surface. A separate QML control strip is placed above it in the view's widget layout; it does not cover the canvas or intercept stylus and touch input.
+Each Android `KisView` keeps Krita's existing `KisCanvasController` and OpenGL canvas as the actual painting surface. A separate QML control strip is placed above it in the view's widget layout; it does not cover the canvas or intercept stylus input.
 
-The control strip connects to native Krita operations for undo, redo, save, export, tool selection, brush size, brush opacity, eraser mode, and paint-layer creation.
+The workspace is deliberately organized around a small number of common actions:
+- A compact document bar for home, undo, redo, save and export.
+- A horizontally scrollable primary tool strip for brush, eraser, picker, fill, gradient, line, ellipse and rectangle.
+- A small More group for pencil, path, text and move tools.
+- Direct foreground/background swatches, a one-tap color swap, and brush size/opacity controls.
+- Mutually exclusive Brushes and Layers panels. Only the panel currently being used is expanded.
 
-### Brushes and colors
+## Native tools and brushes
 
-- The brush panel queries Krita's `PaintOpPresets` resource model, filters by preset name, and activates the selected native `KisPaintOpPreset` through the canvas resource provider.
-- Foreground and background colors can be set using hexadecimal color values, read from the live canvas resource provider, and swapped using Krita's native color resources.
+Tool selection switches Krita's registered native tool factories. The mobile eraser is Krita's brush tool with native eraser mode enabled; selecting another tool clears that mode. Brush presets are queried from Krita's `PaintOpPresets` resource model and activated through the active canvas resource provider.
 
-### Layers
+## Color selection
+
+Tapping either color swatch opens a compact HSV picker. Artists can choose hue, saturation and value directly, enter a hexadecimal color, switch between foreground/background targets, and reuse recent colors from Krita's own color history. The bridge listens to native foreground/background color changes, so eyedropper and other canvas changes update the swatches too. Color values continue to pass through Krita's native `KoColor` and canvas-resource systems.
+
+## Layers
 
 The layer panel traverses the active document's actual node tree. It supports active-node selection, visibility, rename, removal, paint-layer creation, layer opacity, lock state, and raising/lowering the selected node through Krita's node manager.
 
 Layer identifiers cross the QML boundary as hexadecimal strings rather than JavaScript numbers, preserving full pointer precision on 64-bit Android builds. Each operation resolves the identifier against the current active document before acting.
 
-### Adaptive layout
+## Android screen support
 
-On narrow phone widths the brush and layer panels are mutually exclusive to conserve canvas space. At tablet widths both panels can remain open side by side. The QML control widget can expand for its panels while the native canvas remains a separate widget below it.
-
-The canvas controller remains responsible for painting input, pressure handling, and canvas gestures. The QML strip is only a control surface, not a replacement painting engine.
+The Android manifest now declares both normal and small screens as supported, matching the phone-first workspace target. The activity remains resizable and supports orientation and screen-size configuration changes.
 
 ## Validation and limitations
 
-- Static source review confirms the bridge reads the actual brush resource model, active document node tree, and Krita canvas color resources.
-- Layer locking currently uses the node's native lock setter; advanced layer properties such as blending modes, alpha inheritance, clipping groups, and masks are not exposed in the mobile panel.
-- Brush preset editing/tagging/import-export and richer color selection UI remain outside this panel.
-- No Android build or device runtime test has been performed for this PR. Qt Quick/OpenGL coexistence, QML sizing, stylus pressure, touch gestures, and Android color input still require verification on target hardware.
-- Desktop builds are unchanged; all mobile workspace hosting code is guarded by `Q_OS_ANDROID`.
+- Static source review checked the native tool IDs against Krita's registered default-tool factories.
+- The workspace continues to use Krita's native document, brush, layer, color and canvas systems; no parallel painting engine is introduced.
+- The repository currently has no GitHub Actions workflow runs or commit status checks for the mobile integration.
+- No Android SDK/NDK or connected Android device is available in this execution environment, so an APK build, launch, stylus/gesture test and runtime verification could not be performed here.
+- Qt Quick/OpenGL coexistence, QML sizing, touch interaction, pressure/tilt and device-specific performance still require target-device testing.
+- Advanced layer blend modes, masks, alpha inheritance, clipping groups, brush preset editing and brush organization are not exposed in this compact workspace yet.
+- Desktop builds remain outside the Android-only workspace host path; mobile workspace hosting is guarded by `Q_OS_ANDROID`.
