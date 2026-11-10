@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 360
     env:
       ANDROID_ABI: ${{ inputs.abi || 'arm64-v8a' }}
-      KDE_ANDROID_IMAGE: storage.kde.org/vm-images/krita-android-sdk36-2204
+      KDE_ANDROID_IMAGE: s3.kde.org/ci-vm-images/krita-android-sdk36-2204
 
     steps:
       # Keep GitHub's JavaScript actions on the hosted runner. The KDE build
@@ -192,7 +192,7 @@ jobs:
 
       - name: Upload build logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: krita-android-build-logs-${{ github.run_id }}
           path: build-logs/*.log
