@@ -13,6 +13,7 @@
 #include "kritaui_export.h"
 
 class KisMainWindow;
+class KisCanvasResourceProvider;
 
 /**
  * Thin QObject adapter for invoking existing Krita window actions from QML.
@@ -65,7 +66,7 @@ private:
     void connectColorResourceSignals();
 
     KisMainWindow *m_mainWindow {nullptr};
-    class KisCanvasResourceProvider *m_connectedColorResources {nullptr};
+    KisCanvasResourceProvider *m_connectedColorResources {nullptr};
 };
 
 #endif // KIS_MOBILE_BRIDGE_H
