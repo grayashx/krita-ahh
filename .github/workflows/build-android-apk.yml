@@ -21,7 +21,7 @@ jobs:
     name: Build debug APK (${{ inputs.abi }})
     runs-on: ubuntu-24.04
     container:
-      image: s3.kde.org/ci-vm-images/krita-android-sdk36-2204
+      image: storage.kde.org/vm-images/krita-android-sdk36-2204
     timeout-minutes: 360
     env:
       KDECI_ANDROID_ABI: ${{ inputs.abi }}
