@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - ".github/workflows/android-mobile-static-checks.yml"
+      - ".github/workflows/build-android-apk.yml"
+      - "CMakeLists.txt"
+      - "README.android.md"
+      - "build-tools/ci-scripts/android.yml"
       - "libs/ui/KisMobileBridge.*"
       - "libs/ui/KisMainWindow.*"
       - "libs/ui/KisView.cpp"
@@ -16,6 +20,10 @@ on:
       - main
     paths:
       - ".github/workflows/android-mobile-static-checks.yml"
+      - ".github/workflows/build-android-apk.yml"
+      - "CMakeLists.txt"
+      - "README.android.md"
+      - "build-tools/ci-scripts/android.yml"
       - "libs/ui/KisMobileBridge.*"
       - "libs/ui/KisMainWindow.*"
       - "libs/ui/KisView.cpp"
