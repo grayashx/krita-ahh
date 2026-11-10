@@ -99,11 +99,11 @@ jobs:
           set -euo pipefail
           source "$RUNNER_TEMP/krita-build-venv/bin/activate"
           python3 krita-deps-management/tools/setup-env.py \
-            --root "$RUNNER_TEMP/krita-android-env" \
+            --root "$GITHUB_WORKSPACE" \
             --venv "$RUNNER_TEMP/krita-build-venv" \
             --android-abi "$ANDROID_ABI" \
             --full-krita-env
-          source "$RUNNER_TEMP/krita-android-env/base-env"
+          source "$GITHUB_WORKSPACE/base-env"
           source "$GITHUB_WORKSPACE/env"
           {
             echo "KDECI_BUILD_TYPE=Release"
