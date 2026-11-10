@@ -1,58 +1,61 @@
-# Building Krita for Android
+# Building the Android app
 
-First of all, I use linux to do my builds and testing. Although,
-they _should_ work on Windows/macOS, I cannot give any guarantee 
-that it will.
+This fork is a native Krita Android application: C++/Qt, Krita's QWidget/OpenGL
+canvas, and a QML control strip. It is **not** a Tauri application. Tauri's
+webview packaging cannot replace or wrap the existing native canvas and brush
+engine; use Krita's Android packaging pipeline.
 
-## Setting up Android SDK and NDK
+## Build an installable debug APK
 
-We right now use Android NDK version `r18b` to do our builds. So,
-I would recommend to use that. Download it from [google's website](https://developer.android.com/ndk/downloads/older_releases.html)
-then extract it.
+The recommended entry point is the GitHub Actions workflow:
 
-Next, Android SDK. You can either download Android Studio or just
-the `sdk-tools`. Both could be downloaded from [google's website](https://developer.android.com/studio).
+1. Open the repository's **Actions** tab.
+2. Select **Build Android APK**.
+3. Choose an ABI. Use `arm64-v8a` for a typical modern Android phone.
+4. Run the workflow from the branch/commit you want to test.
+5. When it finishes, download the `krita-android-debug-...` artifact from the
+   workflow run.
 
-If you downloaded Android Studio then open SDK manager and download
-`Android SDK Build-Tools`.
-(more info: https://developer.android.com/studio/intro/update#sdk-manager)
+The workflow uses the Android builder image referenced by this repository's
+KDE CI configuration, fetches the matching Krita dependency definitions,
+builds the checked-out source with the Android Qt 5 toolchain, runs the
+existing `create-apk`/Gradle packaging path, and uploads the resulting APK.
+Build logs are uploaded separately, including when the compile or packaging
+step fails.
 
-If you download just `sdk-tools`, then, extract it and run:
+The workflow intentionally builds **debug APKs only**. They are intended for
+installation and device testing, not Play Store or public distribution. The
+Gradle configuration applies the `.debug` application-ID suffix and uses the
+debug signing configuration.
 
-```shell
-cd <extracted-android-sdk-tools>/tools/bin
-./sdkmanager --licenses
-./sdkmanager platform-tools
-./sdkmanager "platforms;android-21"
-./sdkmanager "platforms;android-28"    # for androiddeployqt
-./sdkmanager "build-tools;28.0.2"
-```
+## Local build environment
 
-If you get some `ClassNotFoundException` it might be because `java`
-version is set to `11`. For `sdkmanager` to work, set it to `8` and
-then run it again.
+Use Linux and the same Android SDK/NDK/Qt/KDE toolchain versions as the
+repository's Android CI image. The current Android CI flow expects the
+`/var/lib/ci-files/setup-environment.sh` environment file supplied by that
+builder image. A generic Android Studio installation by itself is not enough:
+Krita also requires its cross-compiled Qt/KDE/third-party dependency tree and
+the Krita Android CMake toolchain.
 
-That's the only dependency we have to manage manually!
+The upstream build guide documents both the prebuilt builder image and the
+host-system workflow:
 
-## Building Krita
+- [Building Krita for Android](https://docs.krita.org/en/untranslatable_pages/building/build_krita_for_android.html)
 
-Now, to build krita, run `<krita-source>/packaging/android/androidbuild.sh --help`
-and pass the required arguments.
+The source-of-truth CI definitions in this repository are:
 
-Example:
+- `build-tools/ci-scripts/android.yml`
+- `build-tools/ci-scripts/build-android-package.py`
+- `packaging/android/apk/build.gradle`
 
-```shell
-./androidbuild.sh -p=all --src=/home/sh_zam/workspace/krita --build-type=Debug --build-root=/home/sh_zam/workspace/build-krita-android --ndk-path=/home/sh_zam/Android/Sdk/ndk-bundle --sdk-path=/home/sh_zam/Android/Sdk --api-level=21 --android-abi=armeabi-v7a
-```
+The packaging script expects the completed native install tree and CMake build
+tree. Calling Gradle alone does not compile Krita's native application.
 
-That's all!
+## Release status
 
-## Installing Krita APK
-
-To install run `adb install -d -r <build-root>/krita_build_apk/build/outputs/apk/debug/krita_build_apk-debug.apk`.
-
-`adb` should be in `<sdk-root>/platform-tools/`
-
-## Crash
-
-If Krita crashes you can look up the logs using `adb logcat`
+A successful debug APK build is not a production release. Before public
+distribution, decide the app identity and branding, set a project-specific
+package ID and version policy, configure protected release signing, and
+complete phone/tablet tests for document workflows, stylus pressure/tilt,
+palm rejection, gestures, save/recovery, performance and memory behavior.
+See [mobile-ui/RELEASE_CHECKLIST.md](mobile-ui/RELEASE_CHECKLIST.md).
