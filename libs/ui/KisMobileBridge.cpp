@@ -33,11 +33,49 @@ KisMobileBridge::KisMobileBridge(KisMainWindow *mainWindow)
     , m_mainWindow(mainWindow)
 {
     if (m_mainWindow) {
-        connect(m_mainWindow, &KisMainWindow::activeViewChanged,
-                this, &KisMobileBridge::documentStateChanged);
-        connect(m_mainWindow, &KisMainWindow::loadCompleted,
-                this, &KisMobileBridge::documentStateChanged);
+        connect(m_mainWindow, &KisMainWindow::activeViewChanged, this, [this]() {
+            connectColorResourceSignals();
+            Q_EMIT documentStateChanged();
+            Q_EMIT colorsChanged();
+        });
+        connect(m_mainWindow, &KisMainWindow::loadCompleted, this, [this]() {
+            connectColorResourceSignals();
+            Q_EMIT documentStateChanged();
+            Q_EMIT colorsChanged();
+        });
+        connectColorResourceSignals();
     }
+}
+
+void KisMobileBridge::connectColorResourceSignals()
+{
+    if (!m_mainWindow || !m_mainWindow->viewManager()) {
+        return;
+    }
+
+    KisCanvasResourceProvider *resources =
+        m_mainWindow->viewManager()->canvasResourceProvider();
+
+    if (resources == m_connectedColorResources) {
+        return;
+    }
+
+    if (m_connectedColorResources) {
+        disconnect(m_connectedColorResources, nullptr, this, nullptr);
+    }
+
+    m_connectedColorResources = resources;
+    if (!resources) {
+        return;
+    }
+
+    connect(resources, &KisCanvasResourceProvider::sigFGColorChanged,
+            this, [this](const KoColor &) { Q_EMIT colorsChanged(); });
+    connect(resources, &KisCanvasResourceProvider::sigBGColorChanged,
+            this, [this](const KoColor &) { Q_EMIT colorsChanged(); });
+    connect(resources, &QObject::destroyed, this, [this]() {
+        m_connectedColorResources = nullptr;
+    });
 }
 
 bool KisMobileBridge::triggerAction(const QString &actionId) const
@@ -151,6 +189,32 @@ QString KisMobileBridge::backgroundColor() const
     return color.name(QColor::HexRgb);
 }
 
+
+QVariantList KisMobileBridge::recentColors() const
+{
+    QVariantList result;
+    if (!hasActiveDocument()) {
+        return result;
+    }
+
+    KisCanvasResourceProvider *resources =
+        m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) {
+        return result;
+    }
+
+    const QList<KoColor> history = resources->colorHistoryColors();
+    for (const KoColor &entry : history) {
+        QColor color;
+        entry.toQColor(&color);
+        if (color.isValid()) {
+            result.append(color.name(QColor::HexRgb));
+        }
+    }
+
+    return result;
+}
+
 bool KisMobileBridge::swapColors() const
 {
     if (!hasActiveDocument()) return false;
@@ -179,10 +243,20 @@ bool KisMobileBridge::setActiveTool(const QString &toolName) const
 
     // Keep the QML surface label-based. Only expose tools that are known to
     // exist in Krita's registered tool factories.
+    // These IDs are registered by Krita's native default-tools plugin.
+    // The mobile UI exposes a small, task-focused subset rather than a desktop
+    // toolbox full of rarely used controls.
     static const QMap<QString, QString> toolIds {
         {QStringLiteral("Brush"), QStringLiteral("KritaShape/KisToolBrush")},
+        {QStringLiteral("Eraser"), QStringLiteral("KritaShape/KisToolBrush")},
         {QStringLiteral("Picker"), QStringLiteral("KritaSelected/KisToolColorSampler")},
-        {QStringLiteral("Shape"), QStringLiteral("KritaShape/KisToolRectangle")},
+        {QStringLiteral("Fill"), QStringLiteral("KritaFill/KisToolFill")},
+        {QStringLiteral("Gradient"), QStringLiteral("KritaFill/KisToolGradient")},
+        {QStringLiteral("Line"), QStringLiteral("KritaShape/KisToolLine")},
+        {QStringLiteral("Ellipse"), QStringLiteral("KritaShape/KisToolEllipse")},
+        {QStringLiteral("Rectangle"), QStringLiteral("KritaShape/KisToolRectangle")},
+        {QStringLiteral("Pencil"), QStringLiteral("KisToolPencil")},
+        {QStringLiteral("Path"), QStringLiteral("KisToolPath")},
         {QStringLiteral("Text"), QStringLiteral("SvgTextTool")},
         {QStringLiteral("Move"), QStringLiteral("KritaTransform/KisToolMove")}
     };
@@ -191,10 +265,20 @@ bool KisMobileBridge::setActiveTool(const QString &toolName) const
     if (it == toolIds.cend()) return false;
 
     KoToolManager *toolManager = m_mainWindow->viewManager()->toolManager();
-    if (!toolManager) return false;
+    KisCanvasResourceProvider *resources =
+        m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!toolManager || !resources) return false;
 
     toolManager->switchToolRequested(it.value());
-    return toolManager->activeToolId() == it.value();
+    if (toolManager->activeToolId() != it.value()) {
+        return false;
+    }
+
+    // Eraser is the native brush tool with Krita's eraser mode enabled.
+    // Selecting any other tool clears the mode so it cannot unexpectedly
+    // remain active when the artist returns to the brush.
+    resources->setEraserMode(toolName == QStringLiteral("Eraser"));
+    return true;
 }
 
 
@@ -267,6 +351,7 @@ bool KisMobileBridge::activateBrushPreset(int resourceId) const
     KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
     if (!resources) return false;
     resources->setPaintOpPreset(preset);
+    resources->setEraserMode(false);
     return true;
 }
 

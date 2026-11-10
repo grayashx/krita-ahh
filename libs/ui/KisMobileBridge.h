@@ -13,6 +13,7 @@
 #include "kritaui_export.h"
 
 class KisMainWindow;
+class KisCanvasResourceProvider;
 
 /**
  * Thin QObject adapter for invoking existing Krita window actions from QML.
@@ -36,6 +37,7 @@ public:
     Q_INVOKABLE bool setBackgroundColor(const QString &colorName) const;
     Q_INVOKABLE QString foregroundColor() const;
     Q_INVOKABLE QString backgroundColor() const;
+    Q_INVOKABLE QVariantList recentColors() const;
     Q_INVOKABLE bool swapColors() const;
     Q_INVOKABLE bool setEraserMode(bool enabled) const;
     Q_INVOKABLE bool setActiveTool(const QString &toolName) const;
@@ -58,9 +60,13 @@ public:
 
 Q_SIGNALS:
     void documentStateChanged();
+    void colorsChanged();
 
 private:
+    void connectColorResourceSignals();
+
     KisMainWindow *m_mainWindow {nullptr};
+    KisCanvasResourceProvider *m_connectedColorResources {nullptr};
 };
 
 #endif // KIS_MOBILE_BRIDGE_H
