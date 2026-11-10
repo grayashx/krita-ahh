@@ -23,6 +23,11 @@ existing `create-apk`/Gradle packaging path, and uploads the resulting APK.
 Build logs are uploaded separately, including when the compile or packaging
 step fails.
 
+Because GitHub only exposes the manual **Run workflow** control after a
+`workflow_dispatch` workflow exists on the repository's default branch, merge
+the workflow PR into `main` first. Then open **Actions → Build Android APK**,
+choose an ABI, and click **Run workflow**.
+
 The workflow intentionally builds **debug APKs only**. They are intended for
 installation and device testing, not Play Store or public distribution. The
 Gradle configuration applies the `.debug` application-ID suffix and uses the
