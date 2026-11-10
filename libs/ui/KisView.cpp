@@ -243,7 +243,9 @@ KisView::KisView(KisDocument *document, KisViewManager *viewManager, QWidget *pa
         static_cast<QObject *>(viewManager->mainWindow()->mobileBridge()));
     mobileControls->setClearColor(QColor(QStringLiteral("#111216")));
     mobileControls->setResizeMode(QQuickWidget::SizeRootObjectToView);
-    mobileControls->setMinimumHeight(132);
+    // Let the canvas retain a usable strip on short/landscape screens.
+    // The QML contextual panel scrolls when the control strip is compressed.
+    mobileControls->setMinimumHeight(104);
     mobileControls->setMaximumHeight(410);
     mobileControls->setSource(QUrl(QStringLiteral("qrc:/mobile-ui/qml/WorkspaceBar.qml")));
 
@@ -252,6 +254,7 @@ KisView::KisView(KisDocument *document, KisViewManager *viewManager, QWidget *pa
     mobileLayout->setSpacing(0);
     mobileLayout->addWidget(mobileControls, 0);
     mobileLayout->addWidget(&d->canvasController, 1);
+    d->canvasController.setMinimumHeight(120);
     d->canvasController.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     d->canvasController.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 #endif

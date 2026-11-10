@@ -56,3 +56,35 @@ Tool selection switches Krita's registered native tool factories. The mobile era
 ## Not exposed in the compact workspace yet
 
 Brush preset file import/export, brush preset duplication, custom tag creation/renaming, advanced mask parameter dialogs, and the full set of Krita's specialized layer types remain available through Krita's broader native resource and layer workflows rather than being duplicated as extra mobile controls.
+
+
+## Canvas input and responsive layout
+
+The Android workspace keeps the native canvas as a separate widget below the QML control strip. The OpenGL canvas accepts Qt touch events; Krita's existing input manager receives touch begin/update/end/cancel and native-gesture events, as well as tablet press/move/release. The default Krita input profile already defines canvas pan, zoom, rotation, and touch-gesture mappings. This pass does not replace those gestures with a second QML gesture system.
+
+The control strip now:
+- Preserves at least 120 px for the native canvas while allowing the controls to shrink to 104 px on short screens.
+- Uses a compact top-bar and control sizing below 420 px width, and wider tool targets on tablet-sized layouts.
+- Shrinks its fixed rows on short/landscape layouts.
+- Makes the active contextual panel vertically scrollable when the remaining height is too small for all controls.
+- Keeps the canvas itself free of QML overlays and gesture interception.
+
+### Static regression checks
+
+Run from the repository root:
+
+```sh
+python3 mobile-ui/tests/verify_mobile_workspace.py
+```
+
+The checks cover duplicate QML function names, QML-to-native bridge consistency, native canvas/widget ordering, touch/tablet event-path declarations, default input-profile gesture mappings, and responsive layout constraints. They are source-level checks, not a QML runtime test or Android device test.
+
+### Physical-device verification still required
+
+This execution environment has no Android SDK/NDK or connected device. The changes have not been APK-built or tested on hardware. Before calling input verification complete, test on at least one phone and one tablet in portrait and landscape:
+- Stylus strokes at light, medium, and firm pressure; verify pressure response and tilt where the device reports it.
+- Continuous strokes near all four canvas edges and while the canvas is zoomed/rotated.
+- Finger pan, pinch zoom, and rotation using the active Krita input profile.
+- Finger input while a stylus is hovering or drawing, including palm rejection and cancellation.
+- Undo/redo after stylus strokes, and switching between canvas tools and QML controls.
+- Confirm the canvas remains usable with each contextual panel open on short screens.

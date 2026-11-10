@@ -31,6 +31,12 @@ Item {
     property var recentColorItems: []
     property string renameLayerId: ""
 
+    readonly property bool compactWidth: width < 420
+    readonly property bool tabletWidth: width >= 760
+    readonly property bool compactHeight: height < 260
+    readonly property real baseControlsHeight: compactHeight ? 104 : 154
+    readonly property real contextPanelHeight: Math.max(0, Math.min(224, height - baseControlsHeight))
+
     readonly property var quickTools: [
         "Brush", "Eraser", "Picker", "Fill", "Gradient",
         "Line", "Ellipse", "Rectangle"
@@ -192,12 +198,6 @@ Item {
         return layer ? layer.opacity : 100
     }
 
-    function selectedLayerOpacity() {
-        for (var i = 0; i < layerItems.length; ++i) {
-            if (layerItems[i].id === selectedLayerId) return layerItems[i].opacity
-        }
-        return 100
-    }
 
     Connections {
         target: kritaBridge
@@ -228,13 +228,13 @@ Item {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 6
-            spacing: 4
+            anchors.margins: root.compactHeight ? 3 : 6
+            spacing: root.compactHeight ? 2 : 4
 
             // Familiar, compact document bar.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 28
+                Layout.preferredHeight: root.compactHeight ? 22 : 28
                 spacing: 3
 
                 ToolButton {
@@ -258,18 +258,19 @@ Item {
                 }
                 Label {
                     text: "Krita"
+                    visible: !root.compactWidth
                     color: "#f0eee9"
                     font.bold: true
                     font.pixelSize: 12
                     Layout.fillWidth: true
                 }
                 ToolButton {
-                    text: "Save"
+                    text: root.compactWidth ? "↓" : "Save"
                     font.pixelSize: 11
                     onClicked: if (kritaBridge) kritaBridge.saveDocument(false)
                 }
                 ToolButton {
-                    text: "Export"
+                    text: root.compactWidth ? "⇧" : "Export"
                     font.pixelSize: 11
                     onClicked: if (kritaBridge) kritaBridge.saveDocument(true)
                 }
@@ -278,7 +279,7 @@ Item {
             // The common tools stay one tap away. Less-used tools live in More.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 30
+                Layout.preferredHeight: root.compactHeight ? 24 : 30
                 spacing: 3
 
                 Flickable {
@@ -318,7 +319,7 @@ Item {
             // Color swatches are direct controls; tap either to open the picker.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 30
+                Layout.preferredHeight: root.compactHeight ? 24 : 30
                 spacing: 5
 
                 Button {
@@ -370,19 +371,19 @@ Item {
                     ToolTip.visible: hovered
                     ToolTip.text: "Swap colors"
                 }
-                Label { text: "Size"; color: "#c7c4be"; font.pixelSize: 10 }
+                Label { text: root.compactWidth ? "S" : "Size"; color: "#c7c4be"; font.pixelSize: 10 }
                 Slider {
                     Layout.fillWidth: true
-                    Layout.minimumWidth: 40
+                    Layout.minimumWidth: root.compactWidth ? 28 : 40
                     from: 0.1
                     to: 500
                     value: kritaBridge ? kritaBridge.brushSize() : 18
                     onMoved: if (kritaBridge) kritaBridge.setBrushSize(value)
                 }
-                Label { text: "Opacity"; color: "#c7c4be"; font.pixelSize: 10 }
+                Label { text: root.compactWidth ? "O" : "Opacity"; color: "#c7c4be"; font.pixelSize: 10 }
                 Slider {
                     Layout.fillWidth: true
-                    Layout.minimumWidth: 40
+                    Layout.minimumWidth: root.compactWidth ? 28 : 40
                     from: 1
                     to: 100
                     value: kritaBridge ? kritaBridge.brushOpacity() : 100
@@ -393,7 +394,7 @@ Item {
             // One contextual panel at a time keeps the canvas and controls calm.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 26
+                Layout.preferredHeight: root.compactHeight ? 22 : 26
                 spacing: 5
 
                 Button {
@@ -415,14 +416,26 @@ Item {
             Rectangle {
                 visible: root.activePanel !== ""
                 Layout.fillWidth: true
-                Layout.preferredHeight: visible ? 224 : 0
+                Layout.preferredHeight: visible ? root.contextPanelHeight : 0
+                Layout.minimumHeight: visible ? Math.min(72, root.contextPanelHeight) : 0
                 color: "#22252d"
                 radius: 6
+                clip: true
 
-                ColumnLayout {
+                Flickable {
+                    id: contextualPanelScroll
                     anchors.fill: parent
-                    anchors.margins: 7
-                    spacing: 4
+                    clip: true
+                    contentWidth: width
+                    contentHeight: 224
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    ColumnLayout {
+                        id: contextualPanelContent
+                        width: contextualPanelScroll.width
+                        height: contextualPanelScroll.contentHeight
+                        spacing: 4
 
                     // COLOR PICKER
                     ColumnLayout {
@@ -831,7 +844,7 @@ Item {
                                 }
                             }
                             Button {
-                                text: "Clip group"
+                                text: root.compactWidth ? "Clip" : "Clip group"
                                 font.pixelSize: 10
                                 Layout.fillWidth: true
                                 onClicked: {
@@ -840,7 +853,7 @@ Item {
                                 }
                             }
                             Button {
-                                text: "Ungroup"
+                                text: root.compactWidth ? "Ungrp" : "Ungroup"
                                 font.pixelSize: 10
                                 Layout.fillWidth: true
                                 enabled: root.selectedLayerData() && root.selectedLayerData().kind === "group"
@@ -976,6 +989,7 @@ Item {
                             }
                         }
                     }
+                }
                 }
             }
         }
