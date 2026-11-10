@@ -171,7 +171,7 @@ class MobileWorkspaceChecks(unittest.TestCase):
         self.assertNotIn("storage.kde.org/vm-images/krita-android-sdk36-2204", self.gitlab_ci)
         self.assertIn("run-ci-build.py", self.android_workflow)
         self.assertIn("build-android-package.py", self.android_workflow)
-        self.assertIn("KRITACI_ANDROID_PACKAGE_TYPE: debug", self.android_workflow)
+        self.assertIn("export KRITACI_ANDROID_PACKAGE_TYPE=debug", self.android_workflow)
         self.assertIn("actions/upload-artifact@v7", self.android_workflow)
         self.assertIn("arm64-v8a", self.android_workflow)
         self.assertIn("actions/checkout@v7", self.android_workflow)
