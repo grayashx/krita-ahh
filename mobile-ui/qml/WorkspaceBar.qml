@@ -687,58 +687,318 @@ Item {
                         }
                     }
 
-                    // BRUSH PRESETS
+                    // BRUSH PRESETS AND MANAGEMENT
                     ColumnLayout {
                         visible: root.activePanel === "brushes"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        TextField {
-                            id: presetSearch
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 30
-                            font.pixelSize: 11
-                            placeholderText: "Search brushes"
-                            onTextChanged: root.refreshPresets()
-                        }
-                        ListView {
+                        spacing: 4
+
+                        ColumnLayout {
+                            visible: !root.brushManagerVisible
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            clip: true
-                            model: root.presetItems
-                            delegate: ItemDelegate {
-                                width: ListView.view.width
-                                height: 34
-                                text: modelData.name
-                                font.pixelSize: 11
-                                onClicked: {
-                                    if (kritaBridge && kritaBridge.activateBrushPreset(modelData.id)) {
-                                        root.activeTool = "Brush"
-                                        root.activePanel = ""
+                            spacing: 4
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                TextField {
+                                    id: presetSearch
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    font.pixelSize: 11
+                                    placeholderText: "Search brushes"
+                                    onTextChanged: root.refreshPresets()
+                                }
+                                ComboBox {
+                                    id: brushTagFilter
+                                    Layout.preferredWidth: 124
+                                    Layout.preferredHeight: 28
+                                    font.pixelSize: 10
+                                    textRole: "name"
+                                    model: root.brushTagChoices
+                                    currentIndex: {
+                                        for (var i = 0; i < root.brushTagChoices.length; ++i) {
+                                            if (root.brushTagChoices[i].url === root.selectedBrushTag) return i
+                                        }
+                                        return 0
+                                    }
+                                    onActivated: {
+                                        root.selectedBrushTag = root.brushTagChoices[index].url
+                                        root.refreshPresets()
                                     }
                                 }
                             }
-                            ScrollBar.vertical: ScrollBar {}
+
+                            ListView {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                clip: true
+                                spacing: 1
+                                model: root.presetItems
+                                delegate: RowLayout {
+                                    width: ListView.view.width
+                                    height: 30
+                                    spacing: 4
+                                    Button {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        text: modelData.name + (modelData.current ? "  •" : "")
+                                        font.pixelSize: 10
+                                        highlighted: modelData.current || root.selectedBrushId === modelData.id
+                                        onClicked: root.selectBrush(modelData)
+                                    }
+                                    ToolButton {
+                                        Layout.preferredWidth: 32
+                                        Layout.fillHeight: true
+                                        text: modelData.favorite ? "★" : "☆"
+                                        font.pixelSize: 16
+                                        onClicked: root.toggleBrushFavorite(modelData)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: modelData.favorite ? "Remove favorite" : "Add favorite"
+                                    }
+                                }
+                                ScrollBar.vertical: ScrollBar {}
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                Button {
+                                    text: "Editor"
+                                    font.pixelSize: 10
+                                    Layout.fillWidth: true
+                                    onClicked: if (kritaBridge) kritaBridge.triggerAction("show_brush_editor")
+                                }
+                                Button {
+                                    text: "Save"
+                                    font.pixelSize: 10
+                                    Layout.fillWidth: true
+                                    enabled: selectedBrushId >= 0
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.saveCurrentBrushPreset()
+                                        root.refreshPresets()
+                                    }
+                                }
+                                Button {
+                                    text: "Manage"
+                                    font.pixelSize: 10
+                                    Layout.fillWidth: true
+                                    enabled: selectedBrushId >= 0
+                                    onClicked: root.brushManagerVisible = true
+                                }
+                            }
+                        }
+
+                        ColumnLayout {
+                            visible: root.brushManagerVisible
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 4
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 22
+                                Label {
+                                    text: "Manage brush"
+                                    color: "#f0eee9"
+                                    font.bold: true
+                                    font.pixelSize: 11
+                                    Layout.fillWidth: true
+                                }
+                                Label {
+                                    text: root.selectedBrushName
+                                    color: "#c7c4be"
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                    Layout.maximumWidth: 150
+                                }
+                                ToolButton {
+                                    text: "‹"
+                                    onClicked: root.brushManagerVisible = false
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                TextField {
+                                    id: renameBrushField
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    font.pixelSize: 10
+                                    placeholderText: "New brush name"
+                                }
+                                Button {
+                                    text: "Rename"
+                                    font.pixelSize: 10
+                                    onClicked: root.renameSelectedBrush()
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                ComboBox {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    font.pixelSize: 10
+                                    textRole: "name"
+                                    model: root.brushTagChoices
+                                    currentIndex: {
+                                        for (var i = 0; i < root.brushTagChoices.length; ++i) {
+                                            if (root.brushTagChoices[i].url === root.selectedBrushTagUrl) return i
+                                        }
+                                        return 0
+                                    }
+                                    onActivated: root.selectedBrushTagUrl = root.brushTagChoices[index].url
+                                }
+                                Button {
+                                    text: "+"
+                                    font.pixelSize: 11
+                                    enabled: root.selectedBrushTagUrl !== ""
+                                    onClicked: root.createSelectedBrushTag()
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Add brush to selected tag"
+                                }
+                                Button {
+                                    text: "−"
+                                    font.pixelSize: 11
+                                    enabled: root.selectedBrushTagUrl !== ""
+                                    onClicked: root.removeSelectedBrushTag()
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Remove brush from selected tag"
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                TextField {
+                                    id: newBrushTagField
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    font.pixelSize: 10
+                                    placeholderText: "Create a brush tag"
+                                }
+                                Button {
+                                    text: "Add tag"
+                                    font.pixelSize: 10
+                                    onClicked: root.createBrushTag()
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                TextField {
+                                    id: copyBrushField
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    font.pixelSize: 10
+                                    text: root.selectedBrushCopyName
+                                    placeholderText: "Copy name"
+                                    onTextChanged: root.selectedBrushCopyName = text
+                                }
+                                Button {
+                                    text: "Save copy"
+                                    font.pixelSize: 10
+                                    onClicked: root.saveBrushCopy()
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                Button {
+                                    text: "Save changes"
+                                    Layout.fillWidth: true
+                                    font.pixelSize: 10
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.saveCurrentBrushPreset()
+                                        root.refreshPresets()
+                                    }
+                                }
+                                Button {
+                                    text: "Brush editor"
+                                    Layout.fillWidth: true
+                                    font.pixelSize: 10
+                                    onClicked: if (kritaBridge) kritaBridge.triggerAction("show_brush_editor")
+                                }
+                            }
                         }
                     }
 
-                    // DOCUMENT LAYERS
+                    // DOCUMENT LAYERS AND ADVANCED PROPERTIES
                     ColumnLayout {
                         visible: root.activePanel === "layers"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        spacing: 3
+
                         RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 24
+                            Layout.preferredHeight: 23
                             Label {
                                 text: "Layers"
                                 color: "#f0eee9"
                                 font.bold: true
+                                font.pixelSize: 11
                                 Layout.fillWidth: true
                             }
                             ToolButton {
                                 text: "+"
+                                onClicked: layerAddMenu.open()
+                                ToolTip.visible: hovered
+                                ToolTip.text: "Add layer or mask"
+                            }
+                            Menu {
+                                id: layerAddMenu
+                                MenuItem {
+                                    text: "Paint layer"
+                                    onTriggered: {
+                                        if (kritaBridge) kritaBridge.addPaintLayer()
+                                        root.refreshLayers()
+                                    }
+                                }
+                                MenuItem {
+                                    text: "Group layer"
+                                    onTriggered: {
+                                        if (kritaBridge) kritaBridge.addGroupLayer()
+                                        root.refreshLayers()
+                                    }
+                                }
+                                MenuItem {
+                                    text: "Transparency mask"
+                                    onTriggered: {
+                                        if (kritaBridge) kritaBridge.addTransparencyMask()
+                                        root.refreshLayers()
+                                    }
+                                }
+                                MenuItem {
+                                    text: "Filter mask"
+                                    onTriggered: {
+                                        if (kritaBridge) kritaBridge.addFilterMask()
+                                        root.refreshLayers()
+                                    }
+                                }
+                            }
+                            ToolButton {
+                                text: "Dup"
+                                font.pixelSize: 9
+                                enabled: root.selectedLayerId !== ""
                                 onClicked: {
-                                    if (kritaBridge) kritaBridge.addPaintLayer()
+                                    if (kritaBridge) kritaBridge.duplicateLayer(root.selectedLayerId)
+                                    root.refreshLayers()
+                                }
+                            }
+                            ToolButton {
+                                text: "Merge"
+                                font.pixelSize: 9
+                                enabled: root.selectedLayerId !== ""
+                                onClicked: {
+                                    if (kritaBridge) kritaBridge.mergeLayerDown(root.selectedLayerId)
                                     root.refreshLayers()
                                 }
                             }
@@ -760,15 +1020,18 @@ Item {
                             }
                             ToolButton { text: "↻"; onClicked: root.refreshLayers() }
                         }
+
                         ListView {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            Layout.minimumHeight: 64
                             clip: true
                             spacing: 1
                             model: root.layerItems
                             delegate: RowLayout {
                                 width: ListView.view.width
-                                height: 34
+                                height: 31
+                                spacing: 2
                                 CheckBox {
                                     checked: modelData.visible
                                     onToggled: {
@@ -778,6 +1041,7 @@ Item {
                                 }
                                 Button {
                                     Layout.fillWidth: true
+                                    Layout.fillHeight: true
                                     text: modelData.name + (modelData.active ? "  •" : "")
                                     font.pixelSize: 10
                                     highlighted: modelData.active || root.selectedLayerId === modelData.id
@@ -795,7 +1059,8 @@ Item {
                                     }
                                 }
                                 TextField {
-                                    Layout.preferredWidth: 72
+                                    Layout.preferredWidth: 68
+                                    Layout.preferredHeight: 27
                                     font.pixelSize: 9
                                     placeholderText: "Rename"
                                     onAccepted: {
@@ -815,10 +1080,11 @@ Item {
                             }
                             ScrollBar.vertical: ScrollBar {}
                         }
+
                         RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 24
-                            Label { text: "Layer opacity"; color: "#c7c4be"; font.pixelSize: 10 }
+                            Layout.preferredHeight: 23
+                            Label { text: "Opacity"; color: "#c7c4be"; font.pixelSize: 10 }
                             Slider {
                                 Layout.fillWidth: true
                                 from: 0
@@ -830,6 +1096,50 @@ Item {
                                         kritaBridge.setLayerOpacity(root.selectedLayerId, value)
                                 }
                                 onPressedChanged: if (!pressed) root.refreshLayers()
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 25
+                            Label { text: "Blend"; color: "#c7c4be"; font.pixelSize: 10 }
+                            ComboBox {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 25
+                                font.pixelSize: 10
+                                model: root.layerBlendItems
+                                textRole: "name"
+                                currentIndex: {
+                                    for (var i = 0; i < root.layerBlendItems.length; ++i) {
+                                        if (root.layerBlendItems[i].id === root.selectedLayerBlendMode) return i
+                                    }
+                                    return 0
+                                }
+                                enabled: root.selectedLayerId !== "" && root.layerBlendItems.length > 0
+                                onActivated: {
+                                    var mode = root.layerBlendItems[index]
+                                    if (mode) root.setSelectedLayerBlendMode(mode.id)
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 24
+                            spacing: 14
+                            CheckBox {
+                                text: "Alpha lock"
+                                font.pixelSize: 10
+                                visible: root.selectedLayerItem() ? root.selectedLayerItem().isPaintLayer : false
+                                checked: root.selectedLayerItem() ? root.selectedLayerItem().alphaLocked : false
+                                onToggled: root.setSelectedLayerAlphaLock(checked)
+                            }
+                            CheckBox {
+                                text: "Inherit alpha"
+                                font.pixelSize: 10
+                                visible: root.selectedLayerItem() ? root.selectedLayerItem().isLayer : false
+                                checked: root.selectedLayerItem() ? root.selectedLayerItem().inheritAlpha : false
+                                onToggled: root.setSelectedLayerInheritAlpha(checked)
                             }
                         }
                     }
