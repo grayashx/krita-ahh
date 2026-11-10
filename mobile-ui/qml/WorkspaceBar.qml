@@ -24,8 +24,12 @@ Item {
     property real pickerValue: 0
     property bool pickerDirty: false
     property var presetItems: []
+    property var brushTagItems: []
+    property string selectedBrushTag: "All"
     property var layerItems: []
+    property var blendModeItems: []
     property var recentColorItems: []
+    property string renameLayerId: ""
 
     readonly property var quickTools: [
         "Brush", "Eraser", "Picker", "Fill", "Gradient",
@@ -118,7 +122,10 @@ Item {
 
     function togglePanel(name) {
         activePanel = activePanel === name ? "" : name
-        if (activePanel === "brushes") refreshPresets()
+        if (activePanel === "brushes") {
+            refreshBrushTags()
+            refreshPresets()
+        }
         if (activePanel === "layers") refreshLayers()
         if (activePanel === "colors") {
             refreshColors()
@@ -127,8 +134,29 @@ Item {
         }
     }
 
+    function refreshBrushTags() {
+        var tags = kritaBridge ? kritaBridge.brushTags() : []
+        var choices = [{ "name": "All brushes", "url": "All" }]
+        for (var i = 0; i < tags.length; ++i) choices.push(tags[i])
+        brushTagItems = choices
+
+        var found = false
+        for (var j = 0; j < brushTagItems.length; ++j) {
+            if (brushTagItems[j].url === selectedBrushTag) found = true
+        }
+        if (!found) selectedBrushTag = "All"
+    }
+
     function refreshPresets() {
-        presetItems = kritaBridge ? kritaBridge.brushPresets(presetSearch.text) : []
+        presetItems = kritaBridge
+            ? kritaBridge.brushPresets(presetSearch.text, selectedBrushTag)
+            : []
+    }
+
+    function refreshBlendModes() {
+        blendModeItems = (kritaBridge && selectedLayerId !== "")
+            ? kritaBridge.blendModes(selectedLayerId)
+            : []
     }
 
     function refreshLayers() {
@@ -137,10 +165,31 @@ Item {
         for (var i = 0; i < layerItems.length; ++i) {
             if (layerItems[i].active) {
                 selectedLayerId = layerItems[i].id
-                return
+                break
             }
         }
-        if (layerItems.length === 0) selectedLayerId = ""
+        refreshBlendModes()
+    }
+
+    function selectedLayerData() {
+        for (var i = 0; i < layerItems.length; ++i) {
+            if (layerItems[i].id === selectedLayerId) return layerItems[i]
+        }
+        return null
+    }
+
+    function selectedBlendModeIndex() {
+        var layer = selectedLayerData()
+        if (!layer) return 0
+        for (var i = 0; i < blendModeItems.length; ++i) {
+            if (blendModeItems[i].id === layer.blendMode) return i
+        }
+        return 0
+    }
+
+    function selectedLayerOpacity() {
+        var layer = selectedLayerData()
+        return layer ? layer.opacity : 100
     }
 
     function selectedLayerOpacity() {
@@ -159,6 +208,8 @@ Item {
         function onDocumentStateChanged() {
             root.refreshColors()
             root.refreshRecentColors()
+            root.refreshBrushTags()
+            root.refreshPresets()
             root.refreshLayers()
         }
     }
@@ -166,6 +217,8 @@ Item {
     Component.onCompleted: {
         refreshColors()
         refreshRecentColors()
+        refreshBrushTags()
+        refreshPresets()
         refreshLayers()
     }
 
@@ -562,48 +615,119 @@ Item {
                         }
                     }
 
-                    // BRUSH PRESETS
+                    // BRUSH LIBRARY: tags, favorites, and Krita's native editor.
                     ColumnLayout {
                         visible: root.activePanel === "brushes"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        spacing: 4
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            ComboBox {
+                                id: brushTagCombo
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 28
+                                model: root.brushTagItems
+                                textRole: "name"
+                                currentIndex: {
+                                    for (var i = 0; i < root.brushTagItems.length; ++i)
+                                        if (root.brushTagItems[i].url === root.selectedBrushTag) return i
+                                    return 0
+                                }
+                                onActivated: {
+                                    root.selectedBrushTag = root.brushTagItems[index].url
+                                    root.refreshPresets()
+                                }
+                            }
+                            ToolButton {
+                                text: "Edit"
+                                font.pixelSize: 10
+                                enabled: !!kritaBridge
+                                onClicked: if (kritaBridge) kritaBridge.triggerAction("show_brush_editor")
+                                ToolTip.visible: hovered
+                                ToolTip.text: "Open Krita brush editor"
+                            }
+                        }
+
                         TextField {
                             id: presetSearch
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 30
+                            Layout.preferredHeight: 28
                             font.pixelSize: 11
                             placeholderText: "Search brushes"
                             onTextChanged: root.refreshPresets()
                         }
+
                         ListView {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
+                            spacing: 1
                             model: root.presetItems
-                            delegate: ItemDelegate {
+                            delegate: RowLayout {
                                 width: ListView.view.width
-                                height: 34
-                                text: modelData.name
-                                font.pixelSize: 11
-                                onClicked: {
-                                    if (kritaBridge && kritaBridge.activateBrushPreset(modelData.id)) {
-                                        root.activeTool = "Brush"
-                                        root.activePanel = ""
+                                height: 31
+                                Button {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    text: modelData.name
+                                    font.pixelSize: 10
+                                    horizontalAlignment: Text.AlignLeft
+                                    onClicked: {
+                                        if (kritaBridge && kritaBridge.activateBrushPreset(modelData.id)) {
+                                            root.activeTool = "Brush"
+                                            root.activePanel = ""
+                                        }
                                     }
+                                }
+                                ToolButton {
+                                    text: modelData.favorite ? "★" : "☆"
+                                    font.pixelSize: 15
+                                    onClicked: {
+                                        if (kritaBridge)
+                                            kritaBridge.setBrushPresetFavorite(modelData.id, !modelData.favorite)
+                                        root.refreshPresets()
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: modelData.favorite ? "Remove favorite" : "Add favorite"
+                                }
+                                ToolButton {
+                                    text: "↗"
+                                    onClicked: {
+                                        if (kritaBridge && kritaBridge.activateBrushPreset(modelData.id)) {
+                                            root.activeTool = "Brush"
+                                            kritaBridge.triggerAction("show_brush_editor")
+                                        }
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Edit this brush"
+                                }
+                                ToolButton {
+                                    text: "×"
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.hideBrushPreset(modelData.id)
+                                        root.refreshPresets()
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Hide preset"
                                 }
                             }
                             ScrollBar.vertical: ScrollBar {}
                         }
                     }
 
-                    // DOCUMENT LAYERS
+                    // LAYERS: properties stay contextual and advanced controls stay grouped.
                     ColumnLayout {
                         visible: root.activePanel === "layers"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        spacing: 3
+
                         RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 24
+                            Layout.preferredHeight: 22
                             Label {
                                 text: "Layers"
                                 color: "#f0eee9"
@@ -614,6 +738,114 @@ Item {
                                 text: "+"
                                 onClicked: {
                                     if (kritaBridge) kritaBridge.addPaintLayer()
+                                    root.refreshLayers()
+                                }
+                                ToolTip.visible: hovered
+                                ToolTip.text: "New paint layer"
+                            }
+                            ToolButton { text: "↻"; onClicked: root.refreshLayers() }
+                        }
+
+                        ListView {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            Layout.minimumHeight: 48
+                            clip: true
+                            spacing: 1
+                            model: root.layerItems
+                            delegate: RowLayout {
+                                width: ListView.view.width
+                                height: 29
+                                ToolButton {
+                                    text: modelData.visible ? "◉" : "○"
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.setLayerVisible(modelData.id, !modelData.visible)
+                                        root.refreshLayers()
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Toggle visibility"
+                                }
+                                ToolButton {
+                                    text: modelData.selected ? "✓" : "□"
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.setLayerSelected(modelData.id, !modelData.selected)
+                                        root.refreshLayers()
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Include in group operation"
+                                }
+                                Button {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    text: modelData.name + (modelData.active ? "  •" : "")
+                                    font.pixelSize: 10
+                                    horizontalAlignment: Text.AlignLeft
+                                    highlighted: modelData.active || root.selectedLayerId === modelData.id
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.activateLayer(modelData.id)
+                                        root.refreshLayers()
+                                    }
+                                }
+                                ToolButton {
+                                    text: modelData.locked ? "🔒" : "🔓"
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.setLayerLocked(modelData.id, !modelData.locked)
+                                        root.refreshLayers()
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Lock layer"
+                                }
+                                ToolButton {
+                                    text: "✎"
+                                    onClicked: {
+                                        root.renameLayerId = modelData.id
+                                        renameLayerField.text = modelData.name
+                                        renameLayerDialog.open()
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Rename"
+                                }
+                                ToolButton {
+                                    text: "×"
+                                    onClicked: {
+                                        if (kritaBridge) kritaBridge.removeLayer(modelData.id)
+                                        root.refreshLayers()
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Remove layer"
+                                }
+                            }
+                            ScrollBar.vertical: ScrollBar {}
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 22
+                            Button {
+                                text: "Group"
+                                font.pixelSize: 10
+                                Layout.fillWidth: true
+                                onClicked: {
+                                    if (kritaBridge) kritaBridge.createGroup()
+                                    root.refreshLayers()
+                                }
+                            }
+                            Button {
+                                text: "Clip group"
+                                font.pixelSize: 10
+                                Layout.fillWidth: true
+                                onClicked: {
+                                    if (kritaBridge) kritaBridge.createClippingGroup()
+                                    root.refreshLayers()
+                                }
+                            }
+                            Button {
+                                text: "Ungroup"
+                                font.pixelSize: 10
+                                Layout.fillWidth: true
+                                enabled: root.selectedLayerData() && root.selectedLayerData().kind === "group"
+                                onClicked: {
+                                    if (kritaBridge) kritaBridge.ungroup()
                                     root.refreshLayers()
                                 }
                             }
@@ -633,67 +865,33 @@ Item {
                                     root.refreshLayers()
                                 }
                             }
-                            ToolButton { text: "↻"; onClicked: root.refreshLayers() }
                         }
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            spacing: 1
-                            model: root.layerItems
-                            delegate: RowLayout {
-                                width: ListView.view.width
-                                height: 34
-                                CheckBox {
-                                    checked: modelData.visible
-                                    onToggled: {
-                                        if (kritaBridge) kritaBridge.setLayerVisible(modelData.id, checked)
-                                        root.refreshLayers()
-                                    }
-                                }
-                                Button {
-                                    Layout.fillWidth: true
-                                    text: modelData.name + (modelData.active ? "  •" : "")
-                                    font.pixelSize: 10
-                                    highlighted: modelData.active || root.selectedLayerId === modelData.id
-                                    onClicked: {
-                                        root.selectedLayerId = modelData.id
-                                        if (kritaBridge) kritaBridge.activateLayer(modelData.id)
-                                        root.refreshLayers()
-                                    }
-                                }
-                                ToolButton {
-                                    text: modelData.locked ? "L" : "U"
-                                    onClicked: {
-                                        if (kritaBridge) kritaBridge.setLayerLocked(modelData.id, !modelData.locked)
-                                        root.refreshLayers()
-                                    }
-                                }
-                                TextField {
-                                    Layout.preferredWidth: 72
-                                    font.pixelSize: 9
-                                    placeholderText: "Rename"
-                                    onAccepted: {
-                                        if (kritaBridge && text.trim().length)
-                                            kritaBridge.renameLayer(modelData.id, text)
-                                        text = ""
-                                        root.refreshLayers()
-                                    }
-                                }
-                                ToolButton {
-                                    text: "×"
-                                    onClicked: {
-                                        if (kritaBridge) kritaBridge.removeLayer(modelData.id)
-                                        root.refreshLayers()
-                                    }
-                                }
-                            }
-                            ScrollBar.vertical: ScrollBar {}
-                        }
+
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 24
-                            Label { text: "Layer opacity"; color: "#c7c4be"; font.pixelSize: 10 }
+                            Label { text: "Blend"; color: "#c7c4be"; font.pixelSize: 10 }
+                            ComboBox {
+                                id: blendModeCombo
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 24
+                                model: root.blendModeItems
+                                textRole: "name"
+                                currentIndex: root.selectedBlendModeIndex()
+                                enabled: root.selectedLayerId !== "" && root.blendModeItems.length > 0
+                                onActivated: {
+                                    var mode = root.blendModeItems[index]
+                                    if (kritaBridge)
+                                        kritaBridge.setLayerBlendMode(root.selectedLayerId, mode.id)
+                                    root.refreshLayers()
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 22
+                            Label { text: "Opacity"; color: "#c7c4be"; font.pixelSize: 10 }
                             Slider {
                                 Layout.fillWidth: true
                                 from: 0
@@ -707,10 +905,102 @@ Item {
                                 onPressedChanged: if (!pressed) root.refreshLayers()
                             }
                         }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 22
+                            Button {
+                                text: root.selectedLayerData() && root.selectedLayerData().alphaLocked ? "Alpha locked" : "Alpha lock"
+                                font.pixelSize: 10
+                                Layout.fillWidth: true
+                                enabled: root.selectedLayerData() && root.selectedLayerData().kind === "paint"
+                                onClicked: {
+                                    var layer = root.selectedLayerData()
+                                    if (kritaBridge && layer)
+                                        kritaBridge.setLayerAlphaLocked(layer.id, !layer.alphaLocked)
+                                    root.refreshLayers()
+                                }
+                            }
+                            Button {
+                                text: root.selectedLayerData() && root.selectedLayerData().inheritAlpha ? "Inherit on" : "Inherit off"
+                                font.pixelSize: 10
+                                Layout.fillWidth: true
+                                enabled: root.selectedLayerData() && (root.selectedLayerData().kind === "paint" || root.selectedLayerData().kind === "group")
+                                onClicked: {
+                                    var layer = root.selectedLayerData()
+                                    if (kritaBridge && layer)
+                                        kritaBridge.setLayerInheritAlpha(layer.id, !layer.inheritAlpha)
+                                    root.refreshLayers()
+                                }
+                            }
+                            Button {
+                                visible: root.selectedLayerData() && root.selectedLayerData().kind === "group"
+                                text: root.selectedLayerData() && root.selectedLayerData().passThrough ? "Pass on" : "Pass off"
+                                font.pixelSize: 10
+                                Layout.fillWidth: true
+                                onClicked: {
+                                    var layer = root.selectedLayerData()
+                                    if (kritaBridge && layer)
+                                        kritaBridge.setGroupPassThrough(layer.id, !layer.passThrough)
+                                    root.refreshLayers()
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 22
+                            ComboBox {
+                                id: maskTypeCombo
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 22
+                                model: [
+                                    { "name": "Transparency", "id": "transparency" },
+                                    { "name": "Selection", "id": "selection" },
+                                    { "name": "Transform", "id": "transform" },
+                                    { "name": "Filter", "id": "filter" },
+                                    { "name": "Colorize", "id": "colorize" }
+                                ]
+                                textRole: "name"
+                            }
+                            Button {
+                                text: "Add mask"
+                                font.pixelSize: 10
+                                enabled: root.selectedLayerId !== ""
+                                onClicked: {
+                                    var mask = maskTypeCombo.model[maskTypeCombo.currentIndex]
+                                    if (kritaBridge && mask)
+                                        kritaBridge.addLayerMask(root.selectedLayerId, mask.id)
+                                    root.refreshLayers()
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    Dialog {
+        id: renameLayerDialog
+        modal: true
+        title: "Rename layer"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        width: Math.min(root.width - 24, 320)
+
+        contentItem: TextField {
+            id: renameLayerField
+            placeholderText: "Layer name"
+            selectByMouse: true
+        }
+
+        onAccepted: {
+            if (kritaBridge && root.renameLayerId !== "" && renameLayerField.text.trim().length)
+                kritaBridge.renameLayer(root.renameLayerId, renameLayerField.text.trim())
+            root.renameLayerId = ""
+            root.refreshLayers()
+        }
+        onRejected: root.renameLayerId = ""
     }
 
     onPickerColorChanged: {

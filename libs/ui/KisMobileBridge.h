@@ -45,13 +45,26 @@ public:
     Q_INVOKABLE bool saveDocument(bool exportImage) const;
     Q_INVOKABLE void showHomeScreen() const;
 
-    Q_INVOKABLE QVariantList brushPresets(const QString &filter = QString()) const;
+    Q_INVOKABLE QVariantList brushTags() const;
+    Q_INVOKABLE QVariantList brushPresets(const QString &filter = QString(), const QString &tagUrl = QString()) const;
     Q_INVOKABLE bool activateBrushPreset(int resourceId) const;
+    Q_INVOKABLE bool setBrushPresetFavorite(int resourceId, bool favorite) const;
+    Q_INVOKABLE bool hideBrushPreset(int resourceId) const;
     Q_INVOKABLE QVariantList layers() const;
     Q_INVOKABLE bool activateLayer(const QString &id) const;
     Q_INVOKABLE bool setLayerVisible(const QString &id, bool visible) const;
     Q_INVOKABLE bool setLayerOpacity(const QString &id, qreal opacityPercent) const;
+    Q_INVOKABLE QVariantList blendModes(const QString &id) const;
+    Q_INVOKABLE bool setLayerBlendMode(const QString &id, const QString &compositeOpId) const;
     Q_INVOKABLE bool setLayerLocked(const QString &id, bool locked) const;
+    Q_INVOKABLE bool setLayerAlphaLocked(const QString &id, bool locked) const;
+    Q_INVOKABLE bool setLayerInheritAlpha(const QString &id, bool enabled) const;
+    Q_INVOKABLE bool setGroupPassThrough(const QString &id, bool enabled) const;
+    Q_INVOKABLE bool setLayerSelected(const QString &id, bool selected) const;
+    Q_INVOKABLE bool addLayerMask(const QString &id, const QString &maskType) const;
+    Q_INVOKABLE bool createGroup() const;
+    Q_INVOKABLE bool createClippingGroup() const;
+    Q_INVOKABLE bool ungroup() const;
     Q_INVOKABLE bool raiseLayer(const QString &id) const;
     Q_INVOKABLE bool lowerLayer(const QString &id) const;
     Q_INVOKABLE bool renameLayer(const QString &id, const QString &name) const;

@@ -12,9 +12,18 @@
 #include "kis_node_manager.h"
 #include "kis_node.h"
 #include "kis_image.h"
+#include "kis_layer.h"
+#include "kis_paint_layer.h"
+#include "kis_group_layer.h"
+#include "kis_layer_properties_icons.h"
 #include "kis_paintop_preset.h"
 #include <KisResourceModel.h>
 #include <KisResourceTypes.h>
+#include <KisTagModel.h>
+#include <KisTagFilterResourceProxyModel.h>
+#include <KisTag.h>
+#include <KoCompositeOpRegistry.h>
+#include <KoColorSpace.h>
 #include <KoToolManager.h>
 #include "kis_canvas_resource_provider.h"
 
@@ -316,25 +325,89 @@ void KisMobileBridge::showHomeScreen() const
 }
 
 
-QVariantList KisMobileBridge::brushPresets(const QString &filter) const
+QVariantList KisMobileBridge::brushTags() const
+{
+    QVariantList result;
+    if (!hasActiveDocument()) return result;
+
+    KisTagModel model(ResourceType::PaintOpPresets);
+    model.setTagFilter(KisTagModel::ShowActiveTags);
+    for (int row = 0; row < model.rowCount(); ++row) {
+        const KisTagSP tag = model.tagForIndex(model.index(row, 0));
+        if (!tag || !tag->valid()) continue;
+        if (tag->url() == QStringLiteral("All") ||
+            tag->url() == QStringLiteral("All untagged")) {
+            continue;
+        }
+
+        QVariantMap item;
+        item.insert(QStringLiteral("url"), tag->url());
+        item.insert(QStringLiteral("name"), tag->name());
+        result.append(item);
+    }
+
+    return result;
+}
+
+QVariantList KisMobileBridge::brushPresets(const QString &filter, const QString &tagUrl) const
 {
     QVariantList result;
     if (!hasActiveDocument()) return result;
 
     KisResourceModel model(ResourceType::PaintOpPresets);
     const QString needle = filter.trimmed();
+    const QString favoritesUrl = QStringLiteral("★ My Favorites");
+
     for (int row = 0; row < model.rowCount(); ++row) {
         const QModelIndex index = model.index(row, 0);
+        const int resourceId = index.data(Qt::UserRole + KisAbstractResourceModel::Id).toInt();
         const QString name = index.data(Qt::UserRole + KisAbstractResourceModel::Name).toString();
         if (!needle.isEmpty() && !name.contains(needle, Qt::CaseInsensitive)) continue;
 
+        const QVector<KisTagSP> tags = model.tagsForResource(resourceId);
+        bool matchesTag = tagUrl.isEmpty() || tagUrl == QStringLiteral("All");
+        bool isFavorite = false;
+        for (const KisTagSP &tag : tags) {
+            if (!tag) continue;
+            if (tag->url() == tagUrl) matchesTag = true;
+            if (tag->url() == favoritesUrl) isFavorite = true;
+        }
+        if (!matchesTag) continue;
+
         QVariantMap item;
-        item.insert(QStringLiteral("id"),
-                    index.data(Qt::UserRole + KisAbstractResourceModel::Id).toInt());
+        item.insert(QStringLiteral("id"), resourceId);
         item.insert(QStringLiteral("name"), name);
+        item.insert(QStringLiteral("favorite"), isFavorite);
         result.append(item);
     }
+
     return result;
+}
+
+bool KisMobileBridge::setBrushPresetFavorite(int resourceId, bool favorite) const
+{
+    if (!hasActiveDocument() || resourceId <= 0) return false;
+
+    KisTagModel tags(ResourceType::PaintOpPresets);
+    tags.setTagFilter(KisTagModel::ShowAllTags);
+    const KisTagSP favorites = tags.tagForUrl(QStringLiteral("★ My Favorites"));
+    if (!favorites || !favorites->valid()) return false;
+
+    KisTagFilterResourceProxyModel tagResources(ResourceType::PaintOpPresets);
+    const QVector<int> ids{resourceId};
+    return favorite
+        ? tagResources.tagResources(favorites, ids)
+        : tagResources.untagResources(favorites, ids);
+}
+
+bool KisMobileBridge::hideBrushPreset(int resourceId) const
+{
+    if (!hasActiveDocument() || resourceId <= 0) return false;
+
+    KisResourceModel model(ResourceType::PaintOpPresets);
+    const QModelIndex index = model.indexForResourceId(resourceId);
+    if (!index.isValid()) return false;
+    return model.setResourceActive(index, false);
 }
 
 bool KisMobileBridge::activateBrushPreset(int resourceId) const
@@ -361,9 +434,12 @@ QVariantList KisMobileBridge::layers() const
     if (!hasActiveDocument()) return result;
 
     KisImageSP image = m_mainWindow->activeView()->image();
-    if (!image || !image->root()) return result;
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!image || !image->root() || !nodeManager) return result;
 
-    KisNodeSP active = m_mainWindow->viewManager()->activeNode();
+    KisNodeSP active = nodeManager->activeNode();
+    const KisNodeList selected = nodeManager->selectedNodes();
+
     std::function<void(KisNodeSP)> appendChildren = [&](KisNodeSP parent) {
         for (KisNodeSP node = parent ? parent->firstChild() : KisNodeSP();
              node;
@@ -376,6 +452,31 @@ QVariantList KisMobileBridge::layers() const
             item.insert(QStringLiteral("opacity"), node->percentOpacity());
             item.insert(QStringLiteral("locked"), node->userLocked());
             item.insert(QStringLiteral("active"), node == active);
+            item.insert(QStringLiteral("selected"), selected.contains(node));
+
+            KisLayer *layer = qobject_cast<KisLayer*>(node.data());
+            KisPaintLayer *paintLayer = qobject_cast<KisPaintLayer*>(node.data());
+            KisGroupLayer *groupLayer = qobject_cast<KisGroupLayer*>(node.data());
+
+            QString kind = QStringLiteral("layer");
+            if (groupLayer) {
+                kind = QStringLiteral("group");
+            } else if (paintLayer) {
+                kind = QStringLiteral("paint");
+            } else if (node->inherits("KisMask")) {
+                kind = QStringLiteral("mask");
+            }
+            item.insert(QStringLiteral("kind"), kind);
+
+            if (layer) {
+                item.insert(QStringLiteral("blendMode"), layer->compositeOpId());
+                item.insert(QStringLiteral("blendModeName"),
+                            KoCompositeOpRegistry::instance().getCompositeOpDisplayName(layer->compositeOpId()));
+                item.insert(QStringLiteral("inheritAlpha"), layer->alphaChannelDisabled());
+            }
+            item.insert(QStringLiteral("alphaLocked"), paintLayer && paintLayer->alphaLocked());
+            item.insert(QStringLiteral("passThrough"), groupLayer && groupLayer->passThroughMode());
+
             result.append(item);
             appendChildren(node);
         }
@@ -418,9 +519,11 @@ bool KisMobileBridge::activateLayer(const QString &id) const
 bool KisMobileBridge::setLayerVisible(const QString &id, bool visible) const
 {
     if (!hasActiveDocument()) return false;
-    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
-    if (!node) return false;
-    node->setVisible(visible);
+    KisImageSP image = m_mainWindow->activeView()->image();
+    KisNodeSP node = findMobileNode(image, id);
+    if (!node || !image) return false;
+    KisLayerPropertiesIcons::setNodePropertyAutoUndo(
+        node, KisLayerPropertiesIcons::visible, visible, image);
     m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
     return true;
 }
@@ -463,9 +566,11 @@ bool KisMobileBridge::setLayerOpacity(const QString &id, qreal opacityPercent) c
 bool KisMobileBridge::setLayerLocked(const QString &id, bool locked) const
 {
     if (!hasActiveDocument()) return false;
-    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
-    if (!node) return false;
-    node->setUserLocked(locked);
+    KisImageSP image = m_mainWindow->activeView()->image();
+    KisNodeSP node = findMobileNode(image, id);
+    if (!node || !image) return false;
+    KisLayerPropertiesIcons::setNodePropertyAutoUndo(
+        node, KisLayerPropertiesIcons::locked, locked, image);
     m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
     return true;
 }
@@ -483,3 +588,188 @@ bool KisMobileBridge::lowerLayer(const QString &id) const
     m_mainWindow->viewManager()->nodeManager()->lowerNode();
     return true;
 }
+
+QVariantList KisMobileBridge::blendModes(const QString &id) const
+{
+    QVariantList result;
+    if (!hasActiveDocument()) return result;
+
+    KisImageSP image = m_mainWindow->activeView()->image();
+    KisNodeSP node = findMobileNode(image, id);
+    KisLayer *layer = qobject_cast<KisLayer*>(node.data());
+    if (!layer) return result;
+
+    const KoColorSpace *colorSpace = layer->parent()
+        ? layer->parent()->colorSpace()
+        : image->colorSpace();
+    if (!colorSpace) return result;
+
+    const auto modes = KoCompositeOpRegistry::instance().getCompositeOps(colorSpace);
+    for (const KoID &mode : modes) {
+        QVariantMap item;
+        item.insert(QStringLiteral("id"), mode.id());
+        item.insert(QStringLiteral("name"), mode.name());
+        result.append(item);
+    }
+    return result;
+}
+
+bool KisMobileBridge::setLayerBlendMode(const QString &id, const QString &compositeOpId) const
+{
+    if (!hasActiveDocument() || compositeOpId.isEmpty()) return false;
+
+    KisImageSP image = m_mainWindow->activeView()->image();
+    KisNodeSP node = findMobileNode(image, id);
+    KisLayer *layer = qobject_cast<KisLayer*>(node.data());
+    if (!layer || !image) return false;
+
+    const KoColorSpace *colorSpace = layer->parent()
+        ? layer->parent()->colorSpace()
+        : image->colorSpace();
+    if (!colorSpace) return false;
+
+    const KoCompositeOp *compositeOp = colorSpace->compositeOp(compositeOpId);
+    if (!compositeOp) return false;
+
+    m_mainWindow->viewManager()->nodeManager()->setNodeCompositeOp(node, compositeOp);
+    return true;
+}
+
+bool KisMobileBridge::setLayerAlphaLocked(const QString &id, bool locked) const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisImageSP image = m_mainWindow->activeView()->image();
+    KisNodeSP node = findMobileNode(image, id);
+    if (!image || !qobject_cast<KisPaintLayer*>(node.data())) return false;
+
+    KisLayerPropertiesIcons::setNodePropertyAutoUndo(
+        node, KisLayerPropertiesIcons::alphaLocked, locked, image);
+    m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
+    return true;
+}
+
+bool KisMobileBridge::setLayerInheritAlpha(const QString &id, bool enabled) const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisImageSP image = m_mainWindow->activeView()->image();
+    KisNodeSP node = findMobileNode(image, id);
+    if (!image || !qobject_cast<KisLayer*>(node.data())) return false;
+
+    KisLayerPropertiesIcons::setNodePropertyAutoUndo(
+        node, KisLayerPropertiesIcons::inheritAlpha, enabled, image);
+    m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
+    return true;
+}
+
+bool KisMobileBridge::setGroupPassThrough(const QString &id, bool enabled) const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisImageSP image = m_mainWindow->activeView()->image();
+    KisNodeSP node = findMobileNode(image, id);
+    if (!image || !qobject_cast<KisGroupLayer*>(node.data())) return false;
+
+    KisLayerPropertiesIcons::setNodePropertyAutoUndo(
+        node, KisLayerPropertiesIcons::passThrough, enabled, image);
+    m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
+    return true;
+}
+
+bool KisMobileBridge::setLayerSelected(const QString &id, bool selected) const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!node || !nodeManager) return false;
+
+    KisNodeList nodes = nodeManager->selectedNodes();
+    if (selected && !nodes.contains(node)) {
+        nodes.append(node);
+    } else if (!selected) {
+        nodes.removeAll(node);
+    }
+    nodeManager->slotSetSelectedNodes(nodes);
+    return true;
+}
+
+bool KisMobileBridge::addLayerMask(const QString &id, const QString &maskType) const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node) return false;
+
+    KisLayerSP layer = qobject_cast<KisLayer*>(node.data());
+    if (!layer) layer = qobject_cast<KisLayer*>(node->parent().data());
+    if (!layer) return false;
+
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    nodeManager->slotUiActivatedNode(layer);
+
+    static const QMap<QString, QString> maskTypes {
+        {QStringLiteral("transparency"), QStringLiteral("KisTransparencyMask")},
+        {QStringLiteral("selection"), QStringLiteral("KisSelectionMask")},
+        {QStringLiteral("transform"), QStringLiteral("KisTransformMask")},
+        {QStringLiteral("filter"), QStringLiteral("KisFilterMask")},
+        {QStringLiteral("colorize"), QStringLiteral("KisColorizeMask")}
+    };
+
+    const auto it = maskTypes.constFind(maskType);
+    if (it == maskTypes.cend()) return false;
+    return !nodeManager->createNode(it.value()).isNull();
+}
+
+bool KisMobileBridge::createGroup() const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!nodeManager) return false;
+
+    KisNodeList nodes = nodeManager->selectedNodes();
+    if (nodes.isEmpty()) {
+        KisNodeSP active = nodeManager->activeNode();
+        if (!active) return false;
+        nodes.append(active);
+        nodeManager->slotSetSelectedNodes(nodes);
+    }
+
+    nodeManager->createQuickGroup();
+    return true;
+}
+
+bool KisMobileBridge::createClippingGroup() const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!nodeManager) return false;
+
+    KisNodeList nodes = nodeManager->selectedNodes();
+    if (nodes.isEmpty()) {
+        KisNodeSP active = nodeManager->activeNode();
+        if (!active) return false;
+        nodes.append(active);
+        nodeManager->slotSetSelectedNodes(nodes);
+    }
+
+    nodeManager->createQuickClippingGroup();
+    return true;
+}
+
+bool KisMobileBridge::ungroup() const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!nodeManager || !qobject_cast<KisGroupLayer*>(nodeManager->activeNode().data())) {
+        return false;
+    }
+
+    nodeManager->quickUngroup();
+    return true;
+}
+
