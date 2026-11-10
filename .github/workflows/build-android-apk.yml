@@ -40,19 +40,48 @@ jobs:
       - name: Check out this source revision
         uses: actions/checkout@v4
 
-      - name: Build and package Krita for Android
+      - name: Prepare KDE Android build environment
         run: |
           set -euo pipefail
 
-          # Match the environment setup used by Krita's Android CI image.
-          test -f /var/lib/ci-files/setup-environment.sh
+          if [[ ! -f /var/lib/ci-files/setup-environment.sh ]]; then
+            echo "::error::The selected KDE Android image does not contain its CI setup script."
+            exit 1
+          fi
+
           source /var/lib/ci-files/setup-environment.sh
+
+          if [[ -z "${ANDROID_HOME:-}" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
+            export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+          if [[ -z "${ANDROID_SDK_ROOT:-}" && -n "${ANDROID_HOME:-}" ]]; then
+            export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          fi
+
+          if [[ -z "${ANDROID_HOME:-}" || ! -d "$ANDROID_HOME" ]]; then
+            echo "::error::Android SDK was not configured by the KDE builder image."
+            env | sort | grep -E '^(ANDROID|KDECI).*ROOT|^(ANDROID_HOME|ANDROID_SDK_ROOT)=' || true
+            exit 1
+          fi
+
+          echo "Android SDK: $ANDROID_HOME"
+          echo "Android ABI: $KDECI_ANDROID_ABI"
+          echo "Android NDK: ${KDECI_ANDROID_NDK_ROOT:-provided by KDE toolchain}"
+
+      - name: Build and package Krita for Android
+        run: |
+          set -euo pipefail
+          source /var/lib/ci-files/setup-environment.sh
+
+          if [[ -z "${ANDROID_HOME:-}" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
+            export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+          if [[ -z "${ANDROID_SDK_ROOT:-}" && -n "${ANDROID_HOME:-}" ]]; then
+            export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          fi
           : "${ANDROID_HOME:?Android SDK path is missing from the builder image}"
-          : "${KDECI_ANDROID_NDK_ROOT:?Android NDK path is missing from the builder image}"
 
           export CI_PROJECT_DIR="$GITHUB_WORKSPACE"
-          # Use the upstream Krita dependency cache; compile the exact source
-          # revision checked out from this GitHub repository.
           export CI_PROJECT_NAME=krita
           export CI_COMMIT_REF_NAME=master
           export CI_COMMIT_SHORT_SHA="${GITHUB_SHA:0:7}"
@@ -79,7 +108,6 @@ jobs:
           python3 -m venv venv --upgrade-deps
           source venv/bin/activate
           python -m pip install -r krita-deps-management/requirements.txt
-          # Keep the venv tools on PATH as in the upstream Android CI setup.
           source venv/bin/activate
           unset VIRTUAL_ENV
 
@@ -98,10 +126,19 @@ jobs:
           python3 -u build-tools/ci-scripts/build-android-package.py \
             2>&1 | tee build-apk.log
 
+          APK_DIR="$KDECI_WORKDIR_PATH/krita/_packaging"
           mkdir -p "$GITHUB_WORKSPACE/_packaging"
-          compgen -G "$KDECI_WORKDIR_PATH/krita/_packaging/*.apk" >/dev/null
-          cp -v "$KDECI_WORKDIR_PATH"/krita/_packaging/*.apk \
-            "$GITHUB_WORKSPACE/_packaging/"
+          mapfile -t APK_FILES < <(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' -print)
+
+          if [[ ${#APK_FILES[@]} -eq 0 ]]; then
+            echo "::error::Krita's packaging script completed but produced no APK files."
+            echo "Contents of $APK_DIR:"
+            find "$APK_DIR" -maxdepth 3 -type f -print || true
+            exit 1
+          fi
+
+          printf 'Found APK: %s\n' "${APK_FILES[@]}"
+          cp -v "${APK_FILES[@]}" "$GITHUB_WORKSPACE/_packaging/"
 
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
