@@ -165,13 +165,16 @@ class MobileWorkspaceChecks(unittest.TestCase):
 
     def test_android_debug_apk_workflow_uses_native_krita_build_pipeline(self) -> None:
         self.assertIn("workflow_dispatch:", self.android_workflow)
-        self.assertIn("storage.kde.org/vm-images/krita-android-sdk36-2204", self.android_workflow)
-        self.assertIn("VM_IMAGE_NAME_ANDROID: 'storage.kde.org/vm-images/krita-android-sdk36-2204'", self.gitlab_ci)
+        self.assertIn("KDE_ANDROID_IMAGE: s3.kde.org/ci-vm-images/krita-android-sdk36-2204", self.android_workflow)
+        self.assertNotIn("storage.kde.org/vm-images/krita-android-sdk36-2204", self.android_workflow)
+        self.assertIn("VM_IMAGE_NAME_ANDROID: 's3.kde.org/ci-vm-images/krita-android-sdk36-2204'", self.gitlab_ci)
+        self.assertNotIn("storage.kde.org/vm-images/krita-android-sdk36-2204", self.gitlab_ci)
         self.assertIn("run-ci-build.py", self.android_workflow)
         self.assertIn("build-android-package.py", self.android_workflow)
         self.assertIn("KRITACI_ANDROID_PACKAGE_TYPE: debug", self.android_workflow)
-        self.assertIn("actions/upload-artifact@v4", self.android_workflow)
+        self.assertIn("actions/upload-artifact@v7", self.android_workflow)
         self.assertIn("arm64-v8a", self.android_workflow)
+        self.assertIn("actions/checkout@v7", self.android_workflow)
         self.assertNotIn("Tauri", self.android_workflow)
 
 if __name__ == "__main__":
