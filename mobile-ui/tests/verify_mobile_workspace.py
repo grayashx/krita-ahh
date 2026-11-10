@@ -31,18 +31,18 @@ class MobileWorkspaceChecks(unittest.TestCase):
         cls.input_tests = read("libs/ui/tests/kis_input_manager_test.cpp")
 
     def test_qml_function_names_are_unique(self) -> None:
-        names = re.findall(r"\\bfunction\\s+([A-Za-z_$][\\w$]*)\\s*\\(", self.qml)
+        names = re.findall(r"\bfunction\s+([A-Za-z_$][\w$]*)\s*\(", self.qml)
         duplicates = sorted({name for name in names if names.count(name) > 1})
         self.assertEqual([], duplicates, f"Duplicate QML functions: {duplicates}")
 
     def test_qml_bridge_calls_have_native_declarations_and_definitions(self) -> None:
-        calls = set(re.findall(r"\\bkritaBridge\\.([A-Za-z_]\\w*)\\s*\\(", self.qml))
+        calls = set(re.findall(r"\bkritaBridge\.([A-Za-z_]\w*)\s*\(", self.qml))
         declarations = set(re.findall(
-            r"\\bQ_INVOKABLE\\s+[\\w:<>*&]+\\s+([A-Za-z_]\\w*)\\s*\\(",
+            r"\bQ_INVOKABLE\s+[\w:<>*&]+\s+([A-Za-z_]\w*)\s*\(",
             self.bridge_h,
         ))
         definitions = set(re.findall(
-            r"\\bKisMobileBridge::([A-Za-z_]\\w*)\\s*\\(",
+            r"\bKisMobileBridge::([A-Za-z_]\w*)\s*\(",
             self.bridge_cpp,
         ))
 
