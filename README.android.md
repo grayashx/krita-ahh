@@ -7,54 +7,48 @@ engine; use Krita's Android packaging pipeline.
 
 ## Build an installable debug APK
 
-The recommended entry point is the GitHub Actions workflow:
+The GitHub Actions workflow builds the **arm64-v8a** Android APK:
 
 1. Open the repository's **Actions** tab.
 2. Select **Build Android APK**.
-3. Choose an ABI. Use `arm64-v8a` for a typical modern Android phone.
-4. Run the workflow from the branch/commit you want to test.
-5. When it finishes, download the `krita-android-debug-...` artifact from the
-   workflow run.
+3. Click **Run workflow**.
+4. When it finishes, download the APK artifact from the workflow run.
 
-The workflow uses the Android builder image referenced by this repository's
-KDE CI configuration, fetches the matching Krita dependency definitions,
-builds the checked-out source with the Android Qt 5 toolchain, runs the
-existing `create-apk`/Gradle packaging path, and uploads the resulting APK.
-Build logs are uploaded separately, including when the compile or packaging
-step fails.
+The workflow uses the documented Linux host-system build procedure from the
+Krita manual. It installs Java 17, Android SDK 36, build-tools 36.0.0 and NDK
+27.3.13750724, then uses KDE's `krita-deps-management` and
+`krita-ci-utilities` repositories to prepare the Android dependency
+environment. It builds only the arm64-v8a target, disables tests, and limits
+native compilation to two parallel jobs to reduce memory pressure.
 
-Because GitHub only exposes the manual **Run workflow** control after a
-`workflow_dispatch` workflow exists on the repository's default branch, merge
-the workflow PR into `main` first. Then open **Actions → Build Android APK**,
-choose an ABI, and click **Run workflow**.
+The standard GitHub-hosted public Ubuntu runner provides 4 CPUs and 16 GB RAM,
+but only 14 GB SSD according to GitHub's published runner specifications.
+The workflow removes several unused preinstalled toolchains and reports disk
+space at each major stage. Krita's dependency and build footprint may still
+exceed the available disk space; the workflow will expose that as a real build
+failure rather than pretending a package was produced.
 
-The workflow intentionally builds **debug APKs only**. They are intended for
+The workflow intentionally builds a **debug APK**. It is intended for
 installation and device testing, not Play Store or public distribution. The
 Gradle configuration applies the `.debug` application-ID suffix and uses the
 debug signing configuration.
 
-## Local build environment
+## Build environment
 
-Use Linux and the same Android SDK/NDK/Qt/KDE toolchain versions as the
-repository's Android CI image. The current Android CI flow expects the
-`/var/lib/ci-files/setup-environment.sh` environment file supplied by that
-builder image. A generic Android Studio installation by itself is not enough:
-Krita also requires its cross-compiled Qt/KDE/third-party dependency tree and
-the Krita Android CMake toolchain.
+Krita's Android build is a native C++/Qt cross-compilation. A generic Android
+Studio installation or Gradle invocation alone is insufficient. The build
+requires the Android SDK/NDK, Krita's Android CMake toolchain, and the
+cross-compiled Qt/KDE/third-party dependency set.
 
-The upstream build guide documents both the prebuilt builder image and the
-host-system workflow:
+The official build procedure is documented here:
 
 - [Building Krita for Android](https://docs.krita.org/en/untranslatable_pages/building/build_krita_for_android.html)
 
-The source-of-truth CI definitions in this repository are:
+The source-of-truth packaging files in this repository are:
 
 - `build-tools/ci-scripts/android.yml`
 - `build-tools/ci-scripts/build-android-package.py`
 - `packaging/android/apk/build.gradle`
-
-The packaging script expects the completed native install tree and CMake build
-tree. Calling Gradle alone does not compile Krita's native application.
 
 ## Release status
 
