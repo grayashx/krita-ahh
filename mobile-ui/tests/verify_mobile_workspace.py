@@ -99,11 +99,14 @@ class MobileWorkspaceChecks(unittest.TestCase):
     def test_document_metadata_and_save_as_use_native_document_apis(self) -> None:
         for method in ("documentTitle", "documentModified", "saveDocumentAs"):
             with self.subTest(method=method):
-                self.assertRegex(self.bridge_h, rf"Q_INVOKABLE\\s+[^;]+\\b{method}\\s*\\(")
+                self.assertRegex(self.bridge_h, rf"Q_INVOKABLE\s+[^;]+\b{method}\s*\(")
                 self.assertIn(f"KisMobileBridge::{method}(", self.bridge_cpp)
 
         self.assertIn("void documentMetadataChanged();", self.bridge_h)
         self.assertIn("QPointer<KisDocument> m_connectedDocument", self.bridge_h)
+        self.assertIn("void modified(bool);", self.document_header)
+        self.assertIn("void sigPathChanged(const QString &path);", self.document_header)
+        self.assertIn("void sigSavingFinished(const QString &filePath);", self.document_header)
         self.assertIn("&KisDocument::modified", self.bridge_cpp)
         self.assertIn("&KisDocument::sigPathChanged", self.bridge_cpp)
         self.assertIn("&KisDocument::sigSavingFinished", self.bridge_cpp)
@@ -125,15 +128,15 @@ class MobileWorkspaceChecks(unittest.TestCase):
         self.assertIn('root.activePanel === "layers"', self.qml)
 
     def test_android_release_identity_and_build_configuration_are_explicit(self) -> None:
-        namespace = re.search(r'namespace\\s*=\\s*"([^"]+)"', self.android_gradle)
+        namespace = re.search(r'namespace\s*=\s*"([^"]+)"', self.android_gradle)
         manifest_package = re.search(r'<manifest[^>]*package="([^"]+)"', self.android_manifest)
         self.assertIsNotNone(namespace)
         self.assertIsNotNone(manifest_package)
         self.assertEqual(namespace.group(1), manifest_package.group(1))
-        self.assertRegex(self.android_gradle, r"minSdkVersion\\s+\\d+")
-        self.assertRegex(self.android_gradle, r"targetSdkVersion\\s+\\d+")
-        self.assertRegex(self.android_gradle, r'versionName\\s+"[^"]+"')
-        self.assertRegex(self.android_gradle, r"versionCode\\s+")
+        self.assertRegex(self.android_gradle, r"minSdkVersion\s+\d+")
+        self.assertRegex(self.android_gradle, r"targetSdkVersion\s+\d+")
+        self.assertRegex(self.android_gradle, r'versionName\s+"[^"]+"')
+        self.assertRegex(self.android_gradle, r"versionCode\s+")
         self.assertIn("release {", self.android_gradle)
 
 
