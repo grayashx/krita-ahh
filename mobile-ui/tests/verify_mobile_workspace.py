@@ -165,17 +165,23 @@ class MobileWorkspaceChecks(unittest.TestCase):
 
     def test_android_debug_apk_workflow_uses_native_krita_build_pipeline(self) -> None:
         self.assertIn("workflow_dispatch:", self.android_workflow)
-        self.assertIn("invent-registry.kde.org/sysadmin/ci-images/krita-android-builder-sdk36-2204:latest", self.android_workflow)
-        self.assertIn("invent-registry.kde.org/sysadmin/ci-images/krita-android-builder-sdk34-2204:latest", self.android_workflow)
-        self.assertIn('echo "KDE_ANDROID_IMAGE=$pulled_image" >> "$GITHUB_ENV"', self.android_workflow)
-        self.assertNotIn("s3.kde.org/ci-vm-images/", self.android_workflow)
-        self.assertNotIn("storage.kde.org/vm-images/", self.android_workflow)
+        self.assertIn("android-actions/setup-android@v3", self.android_workflow)
+        self.assertIn('"platforms;android-36"', self.android_workflow)
+        self.assertIn('"build-tools;36.0.0"', self.android_workflow)
+        self.assertIn('"ndk;27.3.13750724"', self.android_workflow)
+        self.assertIn("setup-env.py", self.android_workflow)
+        self.assertIn("--full-krita-env", self.android_workflow)
         self.assertIn("run-ci-build.py", self.android_workflow)
         self.assertIn("build-android-package.py", self.android_workflow)
+        self.assertIn("BUILD_TESTING=OFF", self.android_workflow)
+        self.assertIn("KRITACI_PARALLEL_JOBS=2", self.android_workflow)
         self.assertIn("export KRITACI_ANDROID_PACKAGE_TYPE=debug", self.android_workflow)
         self.assertIn("actions/upload-artifact@v7", self.android_workflow)
         self.assertIn("arm64-v8a", self.android_workflow)
         self.assertIn("actions/checkout@v7", self.android_workflow)
+        self.assertNotIn("invent-registry.kde.org/sysadmin/ci-images/krita-android-builder", self.android_workflow)
+        self.assertNotIn("s3.kde.org/ci-vm-images/", self.android_workflow)
+        self.assertNotIn("storage.kde.org/vm-images/", self.android_workflow)
         self.assertNotIn("Tauri", self.android_workflow)
 
 if __name__ == "__main__":
