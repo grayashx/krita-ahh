@@ -9,10 +9,9 @@ engine; use Krita's Android packaging pipeline.
 
 The GitHub Actions workflow builds the **arm64-v8a** Android APK:
 
-1. Open the repository's **Actions** tab.
-2. Select **Build Android APK**.
-3. Click **Run workflow**.
-4. When it finishes, download the APK artifact from the workflow run.
+1. Make the repository public before merging the workflow fix. This is required for GitHub's free public runner.
+2. Merge the workflow fix into `main`. The merge automatically starts the arm64-v8a build.
+3. When it finishes, download the APK artifact from the workflow run. The workflow can also be started manually from **Actions → Build Android APK → Run workflow**.
 
 The workflow uses the documented Linux host-system build procedure from the
 Krita manual. It installs Java 17, Android SDK 36, build-tools 36.0.0 and NDK
