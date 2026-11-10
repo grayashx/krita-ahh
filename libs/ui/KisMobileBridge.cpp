@@ -482,7 +482,7 @@ QVariantList KisMobileBridge::layers() const
                 item.insert(QStringLiteral("blendMode"), layer->compositeOpId());
                 item.insert(QStringLiteral("blendModeName"),
                             KoCompositeOpRegistry::instance().getCompositeOpDisplayName(layer->compositeOpId()));
-                item.insert(QStringLiteral("inheritAlpha"), !layer->alphaChannelDisabled());
+                item.insert(QStringLiteral("inheritAlpha"), layer->alphaChannelDisabled());
             }
             item.insert(QStringLiteral("alphaLocked"), paintLayer && paintLayer->alphaLocked());
             item.insert(QStringLiteral("passThrough"), groupLayer && groupLayer->passThroughMode());
