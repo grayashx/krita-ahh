@@ -15,7 +15,14 @@ Item {
     property string activePanel: ""
     property string activeTool: "Brush"
     property string selectedLayerId: ""
+    property string selectedLayerBlendMode: "normal"
     property string colorTarget: "foreground"
+    property int selectedBrushId: -1
+    property string selectedBrushName: ""
+    property string selectedBrushTag: ""
+    property string selectedBrushCopyName: ""
+    property string selectedBrushTagUrl: ""
+    property bool brushManagerVisible: false
     property color foreground: "#000000"
     property color background: "#ffffff"
     property color pickerColor: "#000000"
@@ -24,7 +31,10 @@ Item {
     property real pickerValue: 0
     property bool pickerDirty: false
     property var presetItems: []
+    property var brushTagItems: []
+    property var brushTagChoices: [{ "url": "", "name": "All brushes" }]
     property var layerItems: []
+    property var layerBlendItems: []
     property var recentColorItems: []
 
     readonly property var quickTools: [
@@ -33,7 +43,7 @@ Item {
     ]
     readonly property var moreTools: ["Pencil", "Path", "Text", "Move"]
 
-    implicitHeight: 154 + (activePanel === "" ? 0 : 224)
+    implicitHeight: 154 + (activePanel === "" ? 0 : ((activePanel === "brushes" || activePanel === "layers") ? 250 : 224))
 
     function refreshColors() {
         if (!kritaBridge) return
@@ -118,7 +128,11 @@ Item {
 
     function togglePanel(name) {
         activePanel = activePanel === name ? "" : name
-        if (activePanel === "brushes") refreshPresets()
+        if (activePanel === "brushes") {
+            brushManagerVisible = false
+            refreshBrushTags()
+            refreshPresets()
+        }
         if (activePanel === "layers") refreshLayers()
         if (activePanel === "colors") {
             refreshColors()
@@ -127,20 +141,131 @@ Item {
         }
     }
 
+    function refreshBrushTags() {
+        brushTagItems = kritaBridge ? kritaBridge.brushTags() : []
+        var choices = [{ "url": "", "name": "All brushes" }]
+        for (var i = 0; i < brushTagItems.length; ++i)
+            choices.push(brushTagItems[i])
+        brushTagChoices = choices
+    }
+
     function refreshPresets() {
-        presetItems = kritaBridge ? kritaBridge.brushPresets(presetSearch.text) : []
+        presetItems = kritaBridge
+            ? kritaBridge.brushPresets(presetSearch.text, selectedBrushTag)
+            : []
+        if (selectedBrushId < 0) {
+            for (var i = 0; i < presetItems.length; ++i) {
+                if (presetItems[i].current) {
+                    selectedBrushId = presetItems[i].id
+                    selectedBrushName = presetItems[i].name
+                    selectedBrushCopyName = presetItems[i].name + " Copy"
+                    break
+                }
+            }
+        }
+    }
+
+    function selectBrush(item) {
+        if (!item || !kritaBridge) return
+        selectedBrushId = item.id
+        selectedBrushName = item.name
+        selectedBrushCopyName = item.name + " Copy"
+        if (kritaBridge.activateBrushPreset(item.id)) {
+            activeTool = "Brush"
+            refreshPresets()
+        }
+    }
+
+    function toggleBrushFavorite(item) {
+        if (!kritaBridge || !item) return
+        kritaBridge.setBrushFavorite(item.id, !item.favorite)
+        refreshPresets()
+    }
+
+    function renameSelectedBrush() {
+        if (!kritaBridge || selectedBrushId < 0 || !renameBrushField.text.trim()) return
+        if (kritaBridge.renameBrushPreset(selectedBrushId, renameBrushField.text.trim())) {
+            selectedBrushName = renameBrushField.text.trim()
+            renameBrushField.text = ""
+            refreshPresets()
+        }
+    }
+
+    function createSelectedBrushTag() {
+        if (!kritaBridge || selectedBrushId < 0 || selectedBrushTagUrl === "") return
+        kritaBridge.setBrushTag(selectedBrushId, selectedBrushTagUrl, true)
+        refreshPresets()
+    }
+
+    function removeSelectedBrushTag() {
+        if (!kritaBridge || selectedBrushId < 0 || selectedBrushTagUrl === "") return
+        kritaBridge.setBrushTag(selectedBrushId, selectedBrushTagUrl, false)
+        refreshPresets()
+    }
+
+    function createBrushTag() {
+        if (!kritaBridge || !newBrushTagField.text.trim()) return
+        if (kritaBridge.createBrushTag(newBrushTagField.text.trim())) {
+            newBrushTagField.text = ""
+            refreshBrushTags()
+        }
+    }
+
+    function saveBrushCopy() {
+        if (!kritaBridge || !selectedBrushCopyName.trim()) return
+        if (kritaBridge.saveCurrentBrushPresetCopy(selectedBrushCopyName.trim())) {
+            selectedBrushName = selectedBrushCopyName.trim()
+            selectedBrushCopyName = selectedBrushName + " Copy"
+            selectedBrushId = -1
+            refreshPresets()
+        }
     }
 
     function refreshLayers() {
         layerItems = kritaBridge ? kritaBridge.layers() : []
         selectedLayerId = ""
+        selectedLayerBlendMode = "normal"
         for (var i = 0; i < layerItems.length; ++i) {
             if (layerItems[i].active) {
                 selectedLayerId = layerItems[i].id
+                selectedLayerBlendMode = layerItems[i].blendModeId || "normal"
+                layerBlendItems = kritaBridge ? kritaBridge.layerBlendModes(selectedLayerId) : []
                 return
             }
         }
-        if (layerItems.length === 0) selectedLayerId = ""
+        layerBlendItems = []
+    }
+
+    function selectedLayerItem() {
+        for (var i = 0; i < layerItems.length; ++i) {
+            if (layerItems[i].id === selectedLayerId) return layerItems[i]
+        }
+        return null
+    }
+
+    function selectedLayerOpacity() {
+        var item = selectedLayerItem()
+        return item ? item.opacity : 100
+    }
+
+    function setSelectedLayerBlendMode(modeId) {
+        if (!kritaBridge || selectedLayerId === "") return
+        if (kritaBridge.setLayerBlendMode(selectedLayerId, modeId)) {
+            selectedLayerBlendMode = modeId
+            refreshLayers()
+        }
+    }
+
+    function setSelectedLayerAlphaLock(enabled) {
+        if (!kritaBridge || selectedLayerId === "") return
+        kritaBridge.setLayerAlphaLocked(selectedLayerId, enabled)
+        refreshLayers()
+    }
+
+    function setSelectedLayerInheritAlpha(enabled) {
+        if (!kritaBridge || selectedLayerId === "") return
+        kritaBridge.setLayerInheritAlpha(selectedLayerId, enabled)
+        refreshLayers()
     }
 
     function selectedLayerOpacity() {
