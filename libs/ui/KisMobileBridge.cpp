@@ -351,6 +351,7 @@ bool KisMobileBridge::activateBrushPreset(int resourceId) const
     KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
     if (!resources) return false;
     resources->setPaintOpPreset(preset);
+    resources->setEraserMode(false);
     return true;
 }
 
