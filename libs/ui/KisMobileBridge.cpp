@@ -400,16 +400,6 @@ bool KisMobileBridge::setBrushPresetFavorite(int resourceId, bool favorite) cons
         : tagResources.untagResources(favorites, ids);
 }
 
-bool KisMobileBridge::renameBrushPreset(int resourceId, const QString &name) const
-{
-    if (!hasActiveDocument() || resourceId <= 0 || name.trimmed().isEmpty()) return false;
-
-    KisResourceModel model(ResourceType::PaintOpPresets);
-    KoResourceSP resource = model.resourceForId(resourceId);
-    if (!resource) return false;
-    return model.renameResource(resource, name.trimmed());
-}
-
 bool KisMobileBridge::hideBrushPreset(int resourceId) const
 {
     if (!hasActiveDocument() || resourceId <= 0) return false;
