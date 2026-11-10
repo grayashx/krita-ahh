@@ -90,7 +90,6 @@ jobs:
           test -d "$KDECI_ANDROID_NDK_ROOT"
           test -d "$KDECI_ANDROID_SDK_ROOT"
           command -v cmake
-          command -v ninja
           command -v java
           command -v python3
           java -version
@@ -169,7 +168,7 @@ jobs:
 
           for apk in "${APK_FILES[@]}"; do
             echo "==> Validating APK: $apk"
-            unzip -t "$apk"
+            python3 -c "import sys, zipfile; z=zipfile.ZipFile(sys.argv[1]); sys.exit(1 if z.testzip() else 0)" "$apk"
             cp -v "$apk" /workspace/_packaging/
           done
 
