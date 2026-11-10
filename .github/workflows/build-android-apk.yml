@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - .github/workflows/build-android-apk.yml
   workflow_dispatch:
     inputs:
       abi:
