@@ -125,7 +125,7 @@ jobs:
       - name: Build Krita native libraries for Android
         run: |
           set -euo pipefail
-          source "$RUNNER_TEMP/krita-android-env/base-env"
+          source "$GITHUB_WORKSPACE/base-env"
           source "$GITHUB_WORKSPACE/env"
           export KDECI_BUILD_TYPE=Release
           export KDECI_EXTRA_CMAKE_ARGS="-DHIDE_SAFE_ASSERTS=OFF -DBUILD_TESTING=OFF"
@@ -152,7 +152,7 @@ jobs:
       - name: Package and validate the debug APK
         run: |
           set -euo pipefail
-          source "$RUNNER_TEMP/krita-android-env/base-env"
+          source "$GITHUB_WORKSPACE/base-env"
           source "$GITHUB_WORKSPACE/env"
           export KDECI_ANDROID_ABI="$ANDROID_ABI"
           export KRITACI_ANDROID_PACKAGE_TYPE=debug
