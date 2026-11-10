@@ -53,6 +53,8 @@
 #include <QColor>
 #include <QVariant>
 #include <QQmlContext>
+#include <QQmlEngine>
+#include <QQuickItem>
 #endif
 
 #include <kactioncollection.h>
