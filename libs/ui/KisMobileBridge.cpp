@@ -12,9 +12,14 @@
 #include "kis_node_manager.h"
 #include "kis_node.h"
 #include "kis_image.h"
+#include "kis_layer.h"
+#include "kis_paint_layer.h"
 #include "kis_paintop_preset.h"
 #include <KisResourceModel.h>
 #include <KisResourceTypes.h>
+#include <KisTagModel.h>
+#include <KisTagResourceModel.h>
+#include <KoCompositeOpRegistry.h>
 #include <KoToolManager.h>
 #include "kis_canvas_resource_provider.h"
 
@@ -23,6 +28,7 @@
 #include <QAction>
 #include <QColor>
 #include <QMap>
+#include <QRegularExpression>
 #include <QUrl>
 #include <QVariantMap>
 #include <functional>
@@ -316,25 +322,167 @@ void KisMobileBridge::showHomeScreen() const
 }
 
 
-QVariantList KisMobileBridge::brushPresets(const QString &filter) const
+QVariantList KisMobileBridge::brushPresets(const QString &filter, const QString &tagUrl) const
 {
     QVariantList result;
     if (!hasActiveDocument()) return result;
 
     KisResourceModel model(ResourceType::PaintOpPresets);
     const QString needle = filter.trimmed();
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    const KisPaintOpPresetSP currentPreset = resources ? resources->currentPreset() : KisPaintOpPresetSP();
+    const int currentPresetId = currentPreset ? currentPreset->resourceId() : -1;
+    const QString favoritesUrl = QStringLiteral("★ My Favorites");
+
     for (int row = 0; row < model.rowCount(); ++row) {
         const QModelIndex index = model.index(row, 0);
+        const int resourceId = index.data(Qt::UserRole + KisAbstractResourceModel::Id).toInt();
         const QString name = index.data(Qt::UserRole + KisAbstractResourceModel::Name).toString();
         if (!needle.isEmpty() && !name.contains(needle, Qt::CaseInsensitive)) continue;
 
+        bool isFavorite = false;
+        bool matchesTag = tagUrl.isEmpty();
+        const QVector<KisTagSP> tags = model.tagsForResource(resourceId);
+        for (const KisTagSP &tag : tags) {
+            if (!tag) continue;
+            if (tag->url() == favoritesUrl) isFavorite = true;
+            if (tag->url() == tagUrl) matchesTag = true;
+        }
+        if (!matchesTag) continue;
+
         QVariantMap item;
-        item.insert(QStringLiteral("id"),
-                    index.data(Qt::UserRole + KisAbstractResourceModel::Id).toInt());
+        item.insert(QStringLiteral("id"), resourceId);
         item.insert(QStringLiteral("name"), name);
+        item.insert(QStringLiteral("favorite"), isFavorite);
+        item.insert(QStringLiteral("current"), resourceId == currentPresetId);
+        item.insert(QStringLiteral("dirty"),
+                    index.data(Qt::UserRole + KisAbstractResourceModel::Dirty).toBool());
+        item.insert(QStringLiteral("filename"),
+                    index.data(Qt::UserRole + KisAbstractResourceModel::Filename).toString());
         result.append(item);
     }
     return result;
+}
+
+QVariantList KisMobileBridge::brushTags() const
+{
+    QVariantList result;
+    if (!hasActiveDocument()) return result;
+
+    KisTagModel model(ResourceType::PaintOpPresets);
+    for (int row = 0; row < model.rowCount(); ++row) {
+        const KisTagSP tag = model.tagForIndex(model.index(row, 0));
+        if (!tag || !tag->active()) continue;
+
+        QVariantMap item;
+        item.insert(QStringLiteral("url"), tag->url());
+        item.insert(QStringLiteral("name"), tag->name());
+        item.insert(QStringLiteral("favorite"),
+                    tag->url() == QStringLiteral("★ My Favorites"));
+        result.append(item);
+    }
+    return result;
+}
+
+bool KisMobileBridge::setBrushFavorite(int resourceId, bool favorite) const
+{
+    if (!hasActiveDocument() || resourceId <= 0) return false;
+
+    KisTagModel tags(ResourceType::PaintOpPresets);
+    const KisTagSP favorites = tags.tagForUrl(QStringLiteral("★ My Favorites"));
+    if (!favorites || !favorites->valid()) return false;
+
+    KisTagResourceModel tagResources(ResourceType::PaintOpPresets);
+    const QVector<int> ids{resourceId};
+    return favorite
+        ? tagResources.tagResources(favorites, ids)
+        : tagResources.untagResources(favorites, ids);
+}
+
+bool KisMobileBridge::setBrushTag(int resourceId, const QString &tagUrl, bool tagged) const
+{
+    if (!hasActiveDocument() || resourceId <= 0 || tagUrl.trimmed().isEmpty()) return false;
+
+    KisTagModel tags(ResourceType::PaintOpPresets);
+    const KisTagSP tag = tags.tagForUrl(tagUrl);
+    if (!tag || !tag->valid()) return false;
+
+    KisTagResourceModel tagResources(ResourceType::PaintOpPresets);
+    const QVector<int> ids{resourceId};
+    return tagged
+        ? tagResources.tagResources(tag, ids)
+        : tagResources.untagResources(tag, ids);
+}
+
+bool KisMobileBridge::createBrushTag(const QString &name) const
+{
+    if (!hasActiveDocument() || name.trimmed().isEmpty()) return false;
+
+    KisTagModel tags(ResourceType::PaintOpPresets);
+    const KisTagSP tag = tags.addTag(name.trimmed(), false, QVector<KoResourceSP>());
+    return tag && tag->valid();
+}
+
+bool KisMobileBridge::renameBrushPreset(int resourceId, const QString &name) const
+{
+    if (!hasActiveDocument() || resourceId <= 0 || name.trimmed().isEmpty()) return false;
+
+    KisResourceModel model(ResourceType::PaintOpPresets);
+    KoResourceSP resource = model.resourceForId(resourceId);
+    if (!resource) return false;
+    return model.renameResource(resource, name.trimmed());
+}
+
+bool KisMobileBridge::saveCurrentBrushPreset() const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    const KisPaintOpPresetSP preset = resources->currentPreset();
+    if (!preset || !preset->valid()) return false;
+
+    KisResourceModel model(ResourceType::PaintOpPresets);
+    preset->setDirty(true);
+    const bool saved = preset->resourceId() > 0
+        ? model.updateResource(preset)
+        : model.addResource(preset);
+    return saved;
+}
+
+bool KisMobileBridge::saveCurrentBrushPresetCopy(const QString &name) const
+{
+    if (!hasActiveDocument() || name.trimmed().isEmpty()) return false;
+
+    KisCanvasResourceProvider *resources = m_mainWindow->viewManager()->canvasResourceProvider();
+    if (!resources) return false;
+    const KisPaintOpPresetSP current = resources->currentPreset();
+    if (!current || !current->valid()) return false;
+
+    KisPaintOpPresetSP copy = current->clone().dynamicCast<KisPaintOpPreset>();
+    if (!copy) return false;
+
+    const QString cleanName = name.trimmed();
+    QString filename = cleanName;
+    filename.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9_-]")), QStringLiteral("_"));
+    if (filename.isEmpty()) filename = QStringLiteral("Brush");
+    if (!filename.endsWith(copy->defaultFileExtension(), Qt::CaseInsensitive)) {
+        filename.append(copy->defaultFileExtension());
+    }
+
+    copy->setResourceId(-1);
+    copy->setName(cleanName);
+    copy->setFilename(filename);
+    copy->setValid(true);
+    copy->setDirty(true);
+    copy->setStorageLocation(QString());
+
+    KisResourceModel model(ResourceType::PaintOpPresets);
+    if (!model.addResourceDeduplicateFileName(copy, QString())) return false;
+
+    resources->setPaintOpPreset(copy);
+    resources->setEraserMode(false);
+    return true;
 }
 
 bool KisMobileBridge::activateBrushPreset(int resourceId) const
@@ -376,6 +524,21 @@ QVariantList KisMobileBridge::layers() const
             item.insert(QStringLiteral("opacity"), node->percentOpacity());
             item.insert(QStringLiteral("locked"), node->userLocked());
             item.insert(QStringLiteral("active"), node == active);
+
+            KisLayer *layer = dynamic_cast<KisLayer*>(node.data());
+            KisPaintLayer *paintLayer = dynamic_cast<KisPaintLayer*>(node.data());
+            item.insert(QStringLiteral("isLayer"), layer != nullptr);
+            item.insert(QStringLiteral("isPaintLayer"), paintLayer != nullptr);
+            item.insert(QStringLiteral("blendModeId"),
+                        layer ? layer->compositeOpId() : QString());
+            item.insert(QStringLiteral("blendModeName"),
+                        layer && layer->compositeOp()
+                            ? layer->compositeOp()->description()
+                            : QString());
+            item.insert(QStringLiteral("alphaLocked"),
+                        paintLayer ? paintLayer->alphaLocked() : false);
+            item.insert(QStringLiteral("inheritAlpha"),
+                        layer ? !layer->alphaChannelDisabled() : false);
             result.append(item);
             appendChildren(node);
         }
@@ -415,14 +578,28 @@ bool KisMobileBridge::activateLayer(const QString &id) const
     return true;
 }
 
+static bool selectSingleMobileNode(KisNodeManager *nodeManager, const KisNodeSP &node)
+{
+    if (!nodeManager || !node) return false;
+
+    KisNodeList selectedNodes;
+    selectedNodes.append(node);
+    nodeManager->slotSetSelectedNodes(selectedNodes);
+    if (nodeManager->activeNode() != node) {
+        nodeManager->slotUiActivatedNode(node);
+    }
+    return nodeManager->activeNode() == node;
+}
+
 bool KisMobileBridge::setLayerVisible(const QString &id, bool visible) const
 {
     if (!hasActiveDocument()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
-    if (!node) return false;
-    node->setVisible(visible);
-    m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
-    return true;
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!node || !selectSingleMobileNode(nodeManager, node)) return false;
+
+    if (node->visible() != visible) nodeManager->toggleVisibility();
+    return node->visible() == visible;
 }
 
 bool KisMobileBridge::renameLayer(const QString &id, const QString &name) const
@@ -449,6 +626,125 @@ bool KisMobileBridge::addPaintLayer() const
     return !m_mainWindow->viewManager()->nodeManager()->createPaintLayer().isNull();
 }
 
+bool KisMobileBridge::addGroupLayer() const
+{
+    if (!hasActiveDocument()) return false;
+    return !m_mainWindow->viewManager()->nodeManager()
+        ->createNode(QStringLiteral("KisGroupLayer")).isNull();
+}
+
+bool KisMobileBridge::addTransparencyMask() const
+{
+    if (!hasActiveDocument()) return false;
+    return !m_mainWindow->viewManager()->nodeManager()
+        ->createNode(QStringLiteral("KisTransparencyMask")).isNull();
+}
+
+bool KisMobileBridge::addFilterMask() const
+{
+    if (!hasActiveDocument()) return false;
+    return !m_mainWindow->viewManager()->nodeManager()
+        ->createNode(QStringLiteral("KisFilterMask"), false).isNull();
+}
+
+bool KisMobileBridge::duplicateLayer(const QString &id) const
+{
+    if (!hasActiveDocument()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!node || !selectSingleMobileNode(nodeManager, node)) return false;
+    nodeManager->duplicateActiveNode();
+    return true;
+}
+
+bool KisMobileBridge::mergeLayerDown(const QString &id) const
+{
+    if (!hasActiveDocument()) return false;
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    if (!node || !activateLayer(id)) return false;
+    return triggerAction(QStringLiteral("merge_layer"));
+}
+
+QVariantList KisMobileBridge::layerBlendModes(const QString &id) const
+{
+    QVariantList result;
+    if (!hasActiveDocument()) return result;
+
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    KisLayer *layer = dynamic_cast<KisLayer*>(node.data());
+    if (!layer || !layer->colorSpace()) return result;
+
+    const QStringList commonModes {
+        QStringLiteral("normal"),
+        QStringLiteral("multiply"),
+        QStringLiteral("screen"),
+        QStringLiteral("overlay"),
+        QStringLiteral("darken"),
+        QStringLiteral("lighten"),
+        QStringLiteral("burn"),
+        QStringLiteral("dodge"),
+        QStringLiteral("hard_light"),
+        QStringLiteral("soft_light"),
+        QStringLiteral("add"),
+        QStringLiteral("difference"),
+        QStringLiteral("color"),
+        QStringLiteral("hue"),
+        QStringLiteral("saturation")
+    };
+
+    const KoCompositeOpRegistry &registry = KoCompositeOpRegistry::instance();
+    for (const QString &modeId : commonModes) {
+        if (!layer->colorSpace()->hasCompositeOp(modeId)) continue;
+        QVariantMap item;
+        item.insert(QStringLiteral("id"), modeId);
+        item.insert(QStringLiteral("name"), registry.getCompositeOpDisplayName(modeId));
+        result.append(item);
+    }
+    return result;
+}
+
+bool KisMobileBridge::setLayerBlendMode(const QString &id, const QString &compositeOpId) const
+{
+    if (!hasActiveDocument() || compositeOpId.isEmpty()) return false;
+
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    KisLayer *layer = dynamic_cast<KisLayer*>(node.data());
+    if (!layer || !layer->colorSpace()
+        || !layer->colorSpace()->hasCompositeOp(compositeOpId)) return false;
+
+    const KoCompositeOp *operation = layer->colorSpace()->compositeOp(compositeOpId);
+    if (!operation) return false;
+
+    m_mainWindow->viewManager()->nodeManager()->setNodeCompositeOp(node, operation);
+    return layer->compositeOpId() == compositeOpId;
+}
+
+bool KisMobileBridge::setLayerAlphaLocked(const QString &id, bool locked) const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    KisPaintLayer *paintLayer = dynamic_cast<KisPaintLayer*>(node.data());
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!paintLayer || !selectSingleMobileNode(nodeManager, node)) return false;
+
+    if (paintLayer->alphaLocked() != locked) nodeManager->toggleAlphaLock();
+    return paintLayer->alphaLocked() == locked;
+}
+
+bool KisMobileBridge::setLayerInheritAlpha(const QString &id, bool inheritAlpha) const
+{
+    if (!hasActiveDocument()) return false;
+
+    KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
+    KisLayer *layer = dynamic_cast<KisLayer*>(node.data());
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!layer || !selectSingleMobileNode(nodeManager, node)) return false;
+
+    const bool currentState = !layer->alphaChannelDisabled();
+    if (currentState != inheritAlpha) nodeManager->toggleInheritAlpha();
+    return !layer->alphaChannelDisabled() == inheritAlpha;
+}
 
 bool KisMobileBridge::setLayerOpacity(const QString &id, qreal opacityPercent) const
 {
@@ -464,10 +760,11 @@ bool KisMobileBridge::setLayerLocked(const QString &id, bool locked) const
 {
     if (!hasActiveDocument()) return false;
     KisNodeSP node = findMobileNode(m_mainWindow->activeView()->image(), id);
-    if (!node) return false;
-    node->setUserLocked(locked);
-    m_mainWindow->viewManager()->nodeManager()->nodesUpdated();
-    return true;
+    KisNodeManager *nodeManager = m_mainWindow->viewManager()->nodeManager();
+    if (!node || !selectSingleMobileNode(nodeManager, node)) return false;
+
+    if (node->userLocked() != locked) nodeManager->toggleLock();
+    return node->userLocked() == locked;
 }
 
 bool KisMobileBridge::raiseLayer(const QString &id) const
